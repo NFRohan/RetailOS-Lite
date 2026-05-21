@@ -74,6 +74,7 @@ class YoloDetector:
             imageWidth=image_width,
             imageHeight=image_height,
             confidenceThreshold=confidence,
+            inputImageSize=image_size,
             inferenceMs=inference_ms,
             counts=counts,
             areas=areas,
@@ -158,4 +159,3 @@ def get_detector() -> YoloDetector:
 
 def model_loaded() -> bool:
     return _detector is not None
-

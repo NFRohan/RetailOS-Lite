@@ -15,6 +15,7 @@ export type AnalyzeShelfResponse = {
     modelName: string;
     modelVersion: string;
     analysisSource: string;
+    inputImageSize?: number | null;
     counts: {
       olympic: number;
       competitor: number;
@@ -66,4 +67,3 @@ export type AnalyzeShelfResponse = {
   };
   supervisorSummary: string;
 };
-

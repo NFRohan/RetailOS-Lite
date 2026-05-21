@@ -62,6 +62,8 @@ def model_info():
         "modelPath": str(config.MODEL_PATH),
         "yoloBackend": config.YOLO_BACKEND,
         "modalConfigured": bool(config.MODAL_YOLO_URL),
+        "defaultConfidence": config.DEFAULT_CONFIDENCE,
+        "defaultImageSize": config.DEFAULT_IMAGE_SIZE,
         "classNames": detector.names if detector else {0: "foodie_noodles_olympics", 1: "mr_noodles_competitor"},
     }
 
