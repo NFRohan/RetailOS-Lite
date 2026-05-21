@@ -89,16 +89,24 @@ async function main() {
   };
 
   for (const [i, outlet] of outlets.entries()) {
-    const existing = await prisma.visit.findFirst({
-      where: { outletId: outlet.id, repId: rep.id, status: "FLAGGED" },
-    });
-    if (existing) continue;
-
-    const visit = await prisma.visit.create({
-      data: {
+    const clientVisitId = `seed-${outlet.code}`;
+    const visitStatus = i === 0 ? "COMPLETE" : "FLAGGED";
+    const visit = await prisma.visit.upsert({
+      where: { clientVisitId },
+      update: {
         outletId: outlet.id,
         repId: rep.id,
-        status: i === 0 ? "COMPLETE" : "FLAGGED",
+        status: visitStatus,
+        checkInLat: outlet.latitude,
+        checkInLng: outlet.longitude,
+        notes: "Demo seeded visit",
+        clientTimestamp: new Date(Date.now() - i * 86400000),
+      },
+      create: {
+        clientVisitId,
+        outletId: outlet.id,
+        repId: rep.id,
+        status: visitStatus,
         checkInLat: outlet.latitude,
         checkInLng: outlet.longitude,
         notes: "Demo seeded visit",
@@ -106,13 +114,25 @@ async function main() {
       },
     });
 
-    await prisma.visitImage.create({
-      data: {
-        visitId: visit.id,
-        url: "/demo/placeholder-shelf.svg",
-        localPath: path.join(process.cwd(), "public", "demo", "placeholder-shelf.svg"),
-      },
+    const existingImage = await prisma.visitImage.findFirst({
+      where: { visitId: visit.id, url: "/demo/placeholder-shelf.svg" },
     });
+    if (existingImage) {
+      await prisma.visitImage.update({
+        where: { id: existingImage.id },
+        data: {
+          localPath: path.join(process.cwd(), "public", "demo", "placeholder-shelf.svg"),
+        },
+      });
+    } else {
+      await prisma.visitImage.create({
+        data: {
+          visitId: visit.id,
+          url: "/demo/placeholder-shelf.svg",
+          localPath: path.join(process.cwd(), "public", "demo", "placeholder-shelf.svg"),
+        },
+      });
+    }
 
     const score = i === 0 ? 72 : i === 1 ? 38 : 55;
     const status = score >= 60 ? "acceptable" : "critical";
@@ -122,12 +142,26 @@ async function main() {
       outletName: outlet.name,
       complianceScore: score,
       complianceStatus: status,
-      finalStatus: i === 0 ? "COMPLETE" : "FLAGGED",
+      finalStatus: visitStatus,
     };
 
-    await prisma.aIResult.create({
-      data: {
+    await prisma.aIResult.upsert({
+      where: { visitId: visit.id },
+      create: {
         visitId: visit.id,
+        analysisSource: "YOLO",
+        detectorModel: "retail-shelf-yolo",
+        detectorVersion: "v1",
+        complianceScore: score,
+        status,
+        supervisorSummary: outcome.supervisorSummary,
+        detectedProducts: { olympicCount: outcome.counts.olympic },
+        competitors: { competitorCount: outcome.counts.competitor },
+        posm: outcome.posm,
+        outcomeSummary: outcome,
+        rawModelOutput: {},
+      },
+      update: {
         analysisSource: "YOLO",
         detectorModel: "retail-shelf-yolo",
         detectorVersion: "v1",
@@ -143,11 +177,33 @@ async function main() {
     });
 
     if (i > 0) {
-      await prisma.fraudSignal.create({
-        data: {
+      const existingSignal = await prisma.fraudSignal.findFirst({
+        where: {
           visitId: visit.id,
           type: "GPS_MISMATCH",
-          severity: "HIGH",
+          message: "Check-in GPS is far from outlet location.",
+        },
+      });
+      if (existingSignal) {
+        await prisma.fraudSignal.update({
+          where: { id: existingSignal.id },
+          data: { severity: "HIGH" },
+        });
+      } else {
+        await prisma.fraudSignal.create({
+          data: {
+            visitId: visit.id,
+            type: "GPS_MISMATCH",
+            severity: "HIGH",
+            message: "Check-in GPS is far from outlet location.",
+          },
+        });
+      }
+    } else {
+      await prisma.fraudSignal.deleteMany({
+        where: {
+          visitId: visit.id,
+          type: "GPS_MISMATCH",
           message: "Check-in GPS is far from outlet location.",
         },
       });
