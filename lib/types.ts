@@ -113,4 +113,21 @@ export type VisitListItem = {
   riskStatus: "SAFE" | "REVIEW_NEEDED" | "HIGH_RISK";
 };
 
+export type VisitLogsResponse = {
+  items: VisitListItem[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+  facets: {
+    all: number;
+    safe: number;
+    flagged: number;
+    reviewNeeded: number;
+    highRisk: number;
+  };
+};
+
 export const TERMINAL_STATUSES: VisitStatus[] = ["COMPLETE", "FLAGGED", "FAILED"];
