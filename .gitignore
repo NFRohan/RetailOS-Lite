@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# Node/Next.js
+node_modules/
+.next/
+out/
+dist/
+build/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Generated AI service artifacts
+ai_service/storage/uploads/*
+ai_service/storage/overlays/*
+!ai_service/storage/uploads/.gitkeep
+!ai_service/storage/overlays/.gitkeep
+
+# Logs
+*.log
+logs/
+

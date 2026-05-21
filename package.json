@@ -1,0 +1,24 @@
+{
+  "name": "retailos-lite",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "worker": "tsx worker/src/index.ts",
+    "worker:enqueue-demo": "tsx worker/src/scripts/enqueueDemo.ts",
+    "worker:dry-run": "tsx worker/src/scripts/dryRunAnalyzeVisit.ts",
+    "check:worker": "tsc --noEmit -p tsconfig.worker.json"
+  },
+  "dependencies": {
+    "bullmq": "^5.34.2",
+    "dotenv": "^16.4.7",
+    "ioredis": "^5.4.2",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
+
