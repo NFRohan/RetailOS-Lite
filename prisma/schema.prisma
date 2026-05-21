@@ -1,0 +1,129 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  REP
+  SUPERVISOR
+  ADMIN
+}
+
+enum VisitStatus {
+  PENDING
+  ANALYZING
+  COMPLETE
+  FLAGGED
+  FAILED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role
+  visits       Visit[]
+  createdAt    DateTime @default(now())
+}
+
+model Outlet {
+  id        String   @id @default(cuid())
+  name      String
+  code      String   @unique
+  address   String?
+  latitude  Float?
+  longitude Float?
+  visits    Visit[]
+  createdAt DateTime @default(now())
+}
+
+model Visit {
+  id              String        @id @default(cuid())
+  clientVisitId   String?       @unique
+  outletId        String
+  repId           String
+  status          VisitStatus   @default(PENDING)
+  checkInLat      Float?
+  checkInLng      Float?
+  clientTimestamp DateTime?
+  notes           String?
+  outlet          Outlet        @relation(fields: [outletId], references: [id])
+  rep             User          @relation(fields: [repId], references: [id])
+  images          VisitImage[]
+  aiResult        AIResult?
+  report          VisitReport?
+  fraudSignals    FraudSignal[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model VisitImage {
+  id        String   @id @default(cuid())
+  visitId   String
+  url       String
+  localPath String?
+  imageHash String?
+  metadata  Json?
+  visit     Visit    @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+model AIResult {
+  id                String   @id @default(cuid())
+  visitId           String   @unique
+  analysisSource    String
+  detectorModel     String?
+  detectorVersion   String?
+  complianceScore   Int
+  status            String
+  supervisorSummary String
+  yoloDetections    Json?
+  detectedProducts  Json
+  competitors       Json
+  posm              Json?
+  overlayImageUrl   String?
+  outcomeSummary    Json?
+  rawModelOutput    Json
+  visit             Visit    @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  createdAt         DateTime @default(now())
+}
+
+model VisitReport {
+  id            String   @id @default(cuid())
+  visitId       String   @unique
+  outletId      String
+  title         String
+  summary       String
+  retrievalText String
+  facts         Json
+  visit         Visit    @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model FraudSignal {
+  id        String   @id @default(cuid())
+  visitId   String
+  type      String
+  severity  String
+  message   String
+  metadata  Json?
+  visit     Visit    @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+model EventLog {
+  id        String   @id @default(cuid())
+  visitId   String?
+  jobId     String?
+  event     String
+  level     String
+  traceId   String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+}

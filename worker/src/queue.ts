@@ -4,7 +4,16 @@ import { config, validateWorkerConfig } from "./config.js";
 import { AIServiceClient } from "./services/aiService.js";
 import { analyzeVisit } from "./jobs/analyzeVisit.js";
 import { JsonVisitRepository } from "./repositories/jsonRepository.js";
+import { PrismaVisitRepository } from "./repositories/prismaRepository.js";
 import type { AnalyzeVisitJobData } from "./types/domain.js";
+
+async function createRepository() {
+  if (config.usePrisma && process.env.DATABASE_URL) {
+    const { PrismaClient } = await import("@prisma/client");
+    return new PrismaVisitRepository(new PrismaClient());
+  }
+  return new JsonVisitRepository(config.localDbPath);
+}
 
 export function createRedisConnection() {
   return new Redis(config.redisUrl, {
@@ -24,14 +33,14 @@ export type WorkerRuntime = {
 
 export function createAnalyzeVisitWorker(connection = createRedisConnection()) {
   validateWorkerConfig();
-  const repository = new JsonVisitRepository(config.localDbPath);
   const aiService = new AIServiceClient(config.aiServiceUrl);
   const embedQueue = new Queue(config.embedVisitReportQueueName, { connection });
 
   const worker = new Worker<AnalyzeVisitJobData>(
     config.analyzeVisitQueueName,
-    async (job) =>
-      analyzeVisit(
+    async (job) => {
+      const repository = await createRepository();
+      return analyzeVisit(
         job.data,
         {
           repository,
@@ -51,7 +60,8 @@ export function createAnalyzeVisitWorker(connection = createRedisConnection()) {
           },
         },
         job,
-      ),
+      );
+    },
     {
       connection,
       concurrency: config.workerConcurrency,

@@ -27,6 +27,7 @@ export const config = {
   embedVisitReportQueueName: env("EMBED_VISIT_REPORT_QUEUE", "embed_visit_report"),
   workerConcurrency: envNumber("WORKER_CONCURRENCY", 2),
   localDbPath: env("WORKER_LOCAL_DB_PATH", path.join(rootDir, "worker", "data", "db.json")),
+  usePrisma: env("WORKER_USE_PRISMA", "true").toLowerCase() !== "false",
   defaultLlmEnabled: env("WORKER_USE_LLM", "true").toLowerCase() !== "false",
   fraudGpsThresholdMeters: envNumber("FRAUD_GPS_THRESHOLD_METERS", 200),
   fraudTimestampDelayHours: envNumber("FRAUD_TIMESTAMP_DELAY_HOURS", 6),

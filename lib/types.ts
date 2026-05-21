@@ -1,0 +1,84 @@
+import type { VisitStatus } from "@prisma/client";
+
+export type OutcomeSummary = {
+  visitId: string;
+  outletName: string;
+  finalStatus: string;
+  complianceScore: number;
+  complianceStatus: string;
+  complianceReasons: string[];
+  supervisorSummary: string;
+  recommendedAction: string;
+  counts: { olympic: number; competitor: number; total: number };
+  visibilityRatio: number;
+  posm: {
+    detected: boolean | null;
+    evidence: string;
+    missingReason?: string | null;
+  };
+  fraudSignals: Array<{ type: string; severity: string; message: string }>;
+};
+
+export type VisitDetail = {
+  id: string;
+  status: VisitStatus;
+  checkInLat: number | null;
+  checkInLng: number | null;
+  clientTimestamp: string | null;
+  notes: string | null;
+  createdAt: string;
+  outlet: {
+    id: string;
+    name: string;
+    code: string;
+    address: string | null;
+    latitude: number | null;
+    longitude: number | null;
+  };
+  rep: { id: string; name: string; email: string };
+  images: Array<{
+    id: string;
+    url: string;
+    localPath: string | null;
+    imageHash: string | null;
+  }>;
+  aiResult: {
+    complianceScore: number;
+    status: string;
+    supervisorSummary: string;
+    overlayImageUrl: string | null;
+    outcomeSummary: OutcomeSummary | null;
+    yoloDetections: unknown;
+  } | null;
+  fraudSignals: Array<{
+    id: string;
+    type: string;
+    severity: string;
+    message: string;
+  }>;
+};
+
+export type DashboardData = {
+  visitsToday: number;
+  avgComplianceScore: number;
+  flaggedCount: number;
+  outletsBelowThreshold: number;
+  visits: VisitListItem[];
+  needsAttention: VisitListItem[];
+};
+
+export type VisitListItem = {
+  id: string;
+  status: VisitStatus;
+  createdAt: string;
+  outletName: string;
+  outletCode: string;
+  repName: string;
+  complianceScore: number | null;
+  complianceStatus: string | null;
+  supervisorSummary: string | null;
+  fraudCount: number;
+  hasHighFraud: boolean;
+};
+
+export const TERMINAL_STATUSES: VisitStatus[] = ["COMPLETE", "FLAGGED", "FAILED"];
