@@ -33,295 +33,321 @@
       "analysisSource": "YOLO",
       "detectorModel": "retail-shelf-yolo",
       "detectorVersion": "v1",
-      "complianceScore": 10,
+      "complianceScore": 0,
       "status": "critical",
-      "supervisorSummary": "Outlet is failing compliance because no Olympic products were detected and competitor presence is high.",
+      "supervisorSummary": "No Olympic POSM visible; clear shelf space near front counter and add Olympic branding.",
       "yoloDetections": [
         {
           "label": "mr_noodles_competitor",
           "classId": 1,
           "category": "competitor",
-          "confidence": 0.7637,
+          "confidence": 0.8163,
           "box": {
-            "x": 633.92,
-            "y": 365.15,
-            "width": 78.34,
-            "height": 82.63
+            "x": 76.08,
+            "y": 155.55,
+            "width": 137.14,
+            "height": 82.49
           },
-          "area": 6472.65
+          "area": 11312.46
         },
         {
           "label": "mr_noodles_competitor",
           "classId": 1,
           "category": "competitor",
-          "confidence": 0.7637,
+          "confidence": 0.7887,
           "box": {
-            "x": 762.12,
-            "y": 361.23,
-            "width": 76.82,
-            "height": 88.37
+            "x": 762.44,
+            "y": 358.02,
+            "width": 76.2,
+            "height": 93.98
           },
-          "area": 6788.13
+          "area": 7161.42
         },
         {
           "label": "mr_noodles_competitor",
           "classId": 1,
           "category": "competitor",
-          "confidence": 0.746,
+          "confidence": 0.784,
           "box": {
-            "x": 203.35,
-            "y": 230.16,
-            "width": 120.49,
-            "height": 59.3
+            "x": 206.81,
+            "y": 165.97,
+            "width": 113.69,
+            "height": 73.26
           },
-          "area": 7144.99
+          "area": 8328.75
         },
         {
           "label": "mr_noodles_competitor",
           "classId": 1,
           "category": "competitor",
-          "confidence": 0.7445,
+          "confidence": 0.7805,
           "box": {
-            "x": 205.4,
-            "y": 169.18,
-            "width": 119.58,
-            "height": 67.14
+            "x": 634.41,
+            "y": 360.54,
+            "width": 79.11,
+            "height": 90.74
           },
-          "area": 8028.79
+          "area": 7178.38
         },
         {
           "label": "mr_noodles_competitor",
           "classId": 1,
           "category": "competitor",
-          "confidence": 0.7439,
+          "confidence": 0.7653,
           "box": {
-            "x": 71.6,
-            "y": 228.83,
-            "width": 133.7,
-            "height": 63.66
+            "x": 701.48,
+            "y": 444.46,
+            "width": 65.38,
+            "height": 76.92
           },
-          "area": 8511.58
+          "area": 5028.88
         },
         {
           "label": "mr_noodles_competitor",
           "classId": 1,
           "category": "competitor",
-          "confidence": 0.7417,
+          "confidence": 0.7649,
           "box": {
-            "x": 629.72,
-            "y": 443.69,
-            "width": 81,
-            "height": 73.77
+            "x": 201.8,
+            "y": 228.07,
+            "width": 119.66,
+            "height": 62.64
           },
-          "area": 5974.75
+          "area": 7494.85
         },
         {
           "label": "mr_noodles_competitor",
           "classId": 1,
           "category": "competitor",
-          "confidence": 0.7271,
+          "confidence": 0.7571,
           "box": {
-            "x": 703.6,
-            "y": 360.44,
-            "width": 64.82,
-            "height": 88.65
+            "x": 706.15,
+            "y": 357.98,
+            "width": 63.1,
+            "height": 92.09
           },
-          "area": 5746.23
+          "area": 5811.13
         },
         {
           "label": "mr_noodles_competitor",
           "classId": 1,
           "category": "competitor",
-          "confidence": 0.724,
+          "confidence": 0.7463,
           "box": {
-            "x": 75.63,
-            "y": 161.06,
-            "width": 133.43,
-            "height": 74.96
+            "x": 388.21,
+            "y": 123.65,
+            "width": 85.68,
+            "height": 65.14
           },
-          "area": 10001.77
+          "area": 5581.84
         },
         {
           "label": "mr_noodles_competitor",
           "classId": 1,
           "category": "competitor",
-          "confidence": 0.6964,
+          "confidence": 0.7455,
           "box": {
-            "x": 701.05,
-            "y": 446.51,
-            "width": 64.11,
-            "height": 74.1
+            "x": 316.47,
+            "y": 356.65,
+            "width": 97.19,
+            "height": 91.8
           },
-          "area": 4751.13
+          "area": 8921.7
         },
         {
           "label": "mr_noodles_competitor",
           "classId": 1,
           "category": "competitor",
-          "confidence": 0.6915,
+          "confidence": 0.7447,
           "box": {
-            "x": 256.94,
-            "y": 363.91,
-            "width": 73.56,
-            "height": 75.45
+            "x": 67.93,
+            "y": 227.42,
+            "width": 140.2,
+            "height": 70.1
           },
-          "area": 5550.19
+          "area": 9828.3
         },
         {
           "label": "mr_noodles_competitor",
           "classId": 1,
           "category": "competitor",
-          "confidence": 0.6914,
+          "confidence": 0.7303,
           "box": {
-            "x": 320.86,
-            "y": 359.24,
-            "width": 88.02,
-            "height": 86.4
+            "x": 386.42,
+            "y": 181.77,
+            "width": 79.04,
+            "height": 59.61
           },
-          "area": 7605.23
+          "area": 4711.64
         },
         {
           "label": "mr_noodles_competitor",
           "classId": 1,
           "category": "competitor",
-          "confidence": 0.6838,
+          "confidence": 0.7237,
           "box": {
-            "x": 759.51,
-            "y": 447.84,
-            "width": 66.24,
-            "height": 74.34
+            "x": 453.88,
+            "y": 149.77,
+            "width": 134.5,
+            "height": 150.11
           },
-          "area": 4924.3
+          "area": 20190.07
         },
         {
           "label": "mr_noodles_competitor",
           "classId": 1,
           "category": "competitor",
-          "confidence": 0.6731,
+          "confidence": 0.7217,
           "box": {
-            "x": 244.04,
-            "y": 427.86,
-            "width": 67.47,
-            "height": 71.57
+            "x": 314.09,
+            "y": 234.08,
+            "width": 74.09,
+            "height": 61.15
           },
-          "area": 4828.56
+          "area": 4531.11
         },
         {
           "label": "mr_noodles_competitor",
           "classId": 1,
           "category": "competitor",
-          "confidence": 0.6712,
+          "confidence": 0.7136,
           "box": {
-            "x": 188.47,
-            "y": 425.94,
-            "width": 68.22,
-            "height": 73.41
+            "x": 632.8,
+            "y": 442.25,
+            "width": 77.62,
+            "height": 77.32
           },
-          "area": 5008.27
+          "area": 6001.88
         },
         {
           "label": "mr_noodles_competitor",
           "classId": 1,
           "category": "competitor",
-          "confidence": 0.6709,
+          "confidence": 0.668,
           "box": {
-            "x": 383.04,
-            "y": 182.15,
-            "width": 82.9,
-            "height": 59.84
+            "x": 310.94,
+            "y": 172.72,
+            "width": 80.85,
+            "height": 67.73
           },
-          "area": 4960.26
+          "area": 5475.69
         },
         {
           "label": "mr_noodles_competitor",
           "classId": 1,
           "category": "competitor",
-          "confidence": 0.6705,
+          "confidence": 0.6595,
           "box": {
-            "x": 455.78,
-            "y": 146.57,
-            "width": 132.89,
-            "height": 153.79
+            "x": 256.85,
+            "y": 362.07,
+            "width": 64.3,
+            "height": 72.66
           },
-          "area": 20436.9
+          "area": 4672.42
         },
         {
           "label": "mr_noodles_competitor",
           "classId": 1,
           "category": "competitor",
-          "confidence": 0.6687,
+          "confidence": 0.658,
           "box": {
-            "x": 386.15,
-            "y": 127.36,
-            "width": 83.55,
-            "height": 58.74
+            "x": 759.59,
+            "y": 446.23,
+            "width": 68.66,
+            "height": 81.53
           },
-          "area": 4907.82
+          "area": 5598.07
         },
         {
           "label": "mr_noodles_competitor",
           "classId": 1,
           "category": "competitor",
-          "confidence": 0.6625,
+          "confidence": 0.6579,
           "box": {
-            "x": 308.73,
-            "y": 130.04,
-            "width": 82.53,
-            "height": 52.89
+            "x": 188.32,
+            "y": 422.01,
+            "width": 66.9,
+            "height": 79.26
           },
-          "area": 4364.92
+          "area": 5302.62
         },
         {
           "label": "mr_noodles_competitor",
           "classId": 1,
           "category": "competitor",
-          "confidence": 0.6578,
+          "confidence": 0.6325,
           "box": {
-            "x": 315.98,
-            "y": 177.85,
-            "width": 73.59,
-            "height": 59.52
+            "x": 380.57,
+            "y": 233.97,
+            "width": 80.12,
+            "height": 62.52
           },
-          "area": 4379.93
+          "area": 5009.05
         },
         {
           "label": "mr_noodles_competitor",
           "classId": 1,
           "category": "competitor",
-          "confidence": 0.6035,
+          "confidence": 0.6291,
           "box": {
-            "x": 316.03,
-            "y": 236.49,
-            "width": 72.56,
-            "height": 56.92
+            "x": 35.5,
+            "y": 236.13,
+            "width": 40.53,
+            "height": 48.91
           },
-          "area": 4130.37
+          "area": 1982.1
         },
         {
           "label": "mr_noodles_competitor",
           "classId": 1,
           "category": "competitor",
-          "confidence": 0.5671,
+          "confidence": 0.6132,
           "box": {
-            "x": 383.68,
-            "y": 236.85,
-            "width": 78.47,
-            "height": 58.05
+            "x": 248.3,
+            "y": 426.7,
+            "width": 66.33,
+            "height": 75.4
           },
-          "area": 4554.68
+          "area": 5001.33
         },
         {
           "label": "mr_noodles_competitor",
           "classId": 1,
           "category": "competitor",
-          "confidence": 0.5393,
+          "confidence": 0.6084,
           "box": {
-            "x": 44.29,
-            "y": 167.39,
-            "width": 42.83,
-            "height": 69.81
+            "x": 44.47,
+            "y": 178.09,
+            "width": 40.34,
+            "height": 59.62
           },
-          "area": 2990.16
+          "area": 2405.46
+        },
+        {
+          "label": "mr_noodles_competitor",
+          "classId": 1,
+          "category": "competitor",
+          "confidence": 0.5997,
+          "box": {
+            "x": 306.27,
+            "y": 131.88,
+            "width": 86.41,
+            "height": 52.04
+          },
+          "area": 4496.5
+        },
+        {
+          "label": "mr_noodles_competitor",
+          "classId": 1,
+          "category": "competitor",
+          "confidence": 0.59,
+          "box": {
+            "x": 259.76,
+            "y": 325.25,
+            "width": 80.62,
+            "height": 45.55
+          },
+          "area": 3672.21
         }
       ],
       "detectedProducts": {
@@ -329,11 +355,16 @@
         "visibilityRatio": 0
       },
       "competitors": {
-        "competitorCount": 22,
-        "competitorAreaRatio": 0.1541
+        "competitorCount": 24,
+        "competitorAreaRatio": 0.1689
       },
-      "posm": null,
-      "overlayImageUrl": "http://localhost:8001/artifacts/overlays/visit_demo_001_567c33fe_overlay.jpg",
+      "posm": {
+        "detected": false,
+        "confidence": 0.07,
+        "evidence": "No clearly visible Olympic-branded POSM in the shelf area; visible promotional items are for other brands (e.g., Nescafe and generic store strips).",
+        "missingReason": "Olympic-branded POSM is not visible in the image."
+      },
+      "overlayImageUrl": "http://localhost:8001/artifacts/overlays/visit_demo_001_be49222a_overlay.jpg",
       "rawModelOutput": {
         "visitId": "visit_demo_001",
         "yolo": {
@@ -344,350 +375,409 @@
           "imageWidth": 1280,
           "imageHeight": 720,
           "confidenceThreshold": 0.25,
-          "inferenceMs": 160.83,
+          "inputImageSize": 1280,
+          "inferenceMs": 986.12,
           "counts": {
             "olympic": 0,
-            "competitor": 22,
-            "total": 22
+            "competitor": 24,
+            "total": 24
           },
           "areas": {
             "olympic": 0,
-            "competitor": 142061.61,
-            "total": 142061.61
+            "competitor": 155697.86,
+            "total": 155697.86
           },
           "metrics": {
             "countRatio": 0,
             "visibilityRatio": 0,
             "olympicAreaRatio": 0,
-            "competitorAreaRatio": 0.1541
+            "competitorAreaRatio": 0.1689
           },
           "detections": [
             {
               "label": "mr_noodles_competitor",
               "classId": 1,
               "category": "competitor",
-              "confidence": 0.7637,
+              "confidence": 0.8163,
               "box": {
-                "x": 633.92,
-                "y": 365.15,
-                "width": 78.34,
-                "height": 82.63
+                "x": 76.08,
+                "y": 155.55,
+                "width": 137.14,
+                "height": 82.49
               },
-              "area": 6472.65
+              "area": 11312.46
             },
             {
               "label": "mr_noodles_competitor",
               "classId": 1,
               "category": "competitor",
-              "confidence": 0.7637,
+              "confidence": 0.7887,
               "box": {
-                "x": 762.12,
-                "y": 361.23,
-                "width": 76.82,
-                "height": 88.37
+                "x": 762.44,
+                "y": 358.02,
+                "width": 76.2,
+                "height": 93.98
               },
-              "area": 6788.13
+              "area": 7161.42
             },
             {
               "label": "mr_noodles_competitor",
               "classId": 1,
               "category": "competitor",
-              "confidence": 0.746,
+              "confidence": 0.784,
               "box": {
-                "x": 203.35,
-                "y": 230.16,
-                "width": 120.49,
-                "height": 59.3
+                "x": 206.81,
+                "y": 165.97,
+                "width": 113.69,
+                "height": 73.26
               },
-              "area": 7144.99
+              "area": 8328.75
             },
             {
               "label": "mr_noodles_competitor",
               "classId": 1,
               "category": "competitor",
-              "confidence": 0.7445,
+              "confidence": 0.7805,
               "box": {
-                "x": 205.4,
-                "y": 169.18,
-                "width": 119.58,
-                "height": 67.14
+                "x": 634.41,
+                "y": 360.54,
+                "width": 79.11,
+                "height": 90.74
               },
-              "area": 8028.79
+              "area": 7178.38
             },
             {
               "label": "mr_noodles_competitor",
               "classId": 1,
               "category": "competitor",
-              "confidence": 0.7439,
+              "confidence": 0.7653,
               "box": {
-                "x": 71.6,
-                "y": 228.83,
-                "width": 133.7,
-                "height": 63.66
+                "x": 701.48,
+                "y": 444.46,
+                "width": 65.38,
+                "height": 76.92
               },
-              "area": 8511.58
+              "area": 5028.88
             },
             {
               "label": "mr_noodles_competitor",
               "classId": 1,
               "category": "competitor",
-              "confidence": 0.7417,
+              "confidence": 0.7649,
               "box": {
-                "x": 629.72,
-                "y": 443.69,
-                "width": 81,
-                "height": 73.77
+                "x": 201.8,
+                "y": 228.07,
+                "width": 119.66,
+                "height": 62.64
               },
-              "area": 5974.75
+              "area": 7494.85
             },
             {
               "label": "mr_noodles_competitor",
               "classId": 1,
               "category": "competitor",
-              "confidence": 0.7271,
+              "confidence": 0.7571,
               "box": {
-                "x": 703.6,
-                "y": 360.44,
-                "width": 64.82,
-                "height": 88.65
+                "x": 706.15,
+                "y": 357.98,
+                "width": 63.1,
+                "height": 92.09
               },
-              "area": 5746.23
+              "area": 5811.13
             },
             {
               "label": "mr_noodles_competitor",
               "classId": 1,
               "category": "competitor",
-              "confidence": 0.724,
+              "confidence": 0.7463,
               "box": {
-                "x": 75.63,
-                "y": 161.06,
-                "width": 133.43,
-                "height": 74.96
+                "x": 388.21,
+                "y": 123.65,
+                "width": 85.68,
+                "height": 65.14
               },
-              "area": 10001.77
+              "area": 5581.84
             },
             {
               "label": "mr_noodles_competitor",
               "classId": 1,
               "category": "competitor",
-              "confidence": 0.6964,
+              "confidence": 0.7455,
               "box": {
-                "x": 701.05,
-                "y": 446.51,
-                "width": 64.11,
-                "height": 74.1
+                "x": 316.47,
+                "y": 356.65,
+                "width": 97.19,
+                "height": 91.8
               },
-              "area": 4751.13
+              "area": 8921.7
             },
             {
               "label": "mr_noodles_competitor",
               "classId": 1,
               "category": "competitor",
-              "confidence": 0.6915,
+              "confidence": 0.7447,
               "box": {
-                "x": 256.94,
-                "y": 363.91,
-                "width": 73.56,
-                "height": 75.45
+                "x": 67.93,
+                "y": 227.42,
+                "width": 140.2,
+                "height": 70.1
               },
-              "area": 5550.19
+              "area": 9828.3
             },
             {
               "label": "mr_noodles_competitor",
               "classId": 1,
               "category": "competitor",
-              "confidence": 0.6914,
+              "confidence": 0.7303,
               "box": {
-                "x": 320.86,
-                "y": 359.24,
-                "width": 88.02,
-                "height": 86.4
+                "x": 386.42,
+                "y": 181.77,
+                "width": 79.04,
+                "height": 59.61
               },
-              "area": 7605.23
+              "area": 4711.64
             },
             {
               "label": "mr_noodles_competitor",
               "classId": 1,
               "category": "competitor",
-              "confidence": 0.6838,
+              "confidence": 0.7237,
               "box": {
-                "x": 759.51,
-                "y": 447.84,
-                "width": 66.24,
-                "height": 74.34
+                "x": 453.88,
+                "y": 149.77,
+                "width": 134.5,
+                "height": 150.11
               },
-              "area": 4924.3
+              "area": 20190.07
             },
             {
               "label": "mr_noodles_competitor",
               "classId": 1,
               "category": "competitor",
-              "confidence": 0.6731,
+              "confidence": 0.7217,
               "box": {
-                "x": 244.04,
-                "y": 427.86,
-                "width": 67.47,
-                "height": 71.57
+                "x": 314.09,
+                "y": 234.08,
+                "width": 74.09,
+                "height": 61.15
               },
-              "area": 4828.56
+              "area": 4531.11
             },
             {
               "label": "mr_noodles_competitor",
               "classId": 1,
               "category": "competitor",
-              "confidence": 0.6712,
+              "confidence": 0.7136,
               "box": {
-                "x": 188.47,
-                "y": 425.94,
-                "width": 68.22,
-                "height": 73.41
+                "x": 632.8,
+                "y": 442.25,
+                "width": 77.62,
+                "height": 77.32
               },
-              "area": 5008.27
+              "area": 6001.88
             },
             {
               "label": "mr_noodles_competitor",
               "classId": 1,
               "category": "competitor",
-              "confidence": 0.6709,
+              "confidence": 0.668,
               "box": {
-                "x": 383.04,
-                "y": 182.15,
-                "width": 82.9,
-                "height": 59.84
+                "x": 310.94,
+                "y": 172.72,
+                "width": 80.85,
+                "height": 67.73
               },
-              "area": 4960.26
+              "area": 5475.69
             },
             {
               "label": "mr_noodles_competitor",
               "classId": 1,
               "category": "competitor",
-              "confidence": 0.6705,
+              "confidence": 0.6595,
               "box": {
-                "x": 455.78,
-                "y": 146.57,
-                "width": 132.89,
-                "height": 153.79
+                "x": 256.85,
+                "y": 362.07,
+                "width": 64.3,
+                "height": 72.66
               },
-              "area": 20436.9
+              "area": 4672.42
             },
             {
               "label": "mr_noodles_competitor",
               "classId": 1,
               "category": "competitor",
-              "confidence": 0.6687,
+              "confidence": 0.658,
               "box": {
-                "x": 386.15,
-                "y": 127.36,
-                "width": 83.55,
-                "height": 58.74
+                "x": 759.59,
+                "y": 446.23,
+                "width": 68.66,
+                "height": 81.53
               },
-              "area": 4907.82
+              "area": 5598.07
             },
             {
               "label": "mr_noodles_competitor",
               "classId": 1,
               "category": "competitor",
-              "confidence": 0.6625,
+              "confidence": 0.6579,
               "box": {
-                "x": 308.73,
-                "y": 130.04,
-                "width": 82.53,
-                "height": 52.89
+                "x": 188.32,
+                "y": 422.01,
+                "width": 66.9,
+                "height": 79.26
               },
-              "area": 4364.92
+              "area": 5302.62
             },
             {
               "label": "mr_noodles_competitor",
               "classId": 1,
               "category": "competitor",
-              "confidence": 0.6578,
+              "confidence": 0.6325,
               "box": {
-                "x": 315.98,
-                "y": 177.85,
-                "width": 73.59,
-                "height": 59.52
+                "x": 380.57,
+                "y": 233.97,
+                "width": 80.12,
+                "height": 62.52
               },
-              "area": 4379.93
+              "area": 5009.05
             },
             {
               "label": "mr_noodles_competitor",
               "classId": 1,
               "category": "competitor",
-              "confidence": 0.6035,
+              "confidence": 0.6291,
               "box": {
-                "x": 316.03,
-                "y": 236.49,
-                "width": 72.56,
-                "height": 56.92
+                "x": 35.5,
+                "y": 236.13,
+                "width": 40.53,
+                "height": 48.91
               },
-              "area": 4130.37
+              "area": 1982.1
             },
             {
               "label": "mr_noodles_competitor",
               "classId": 1,
               "category": "competitor",
-              "confidence": 0.5671,
+              "confidence": 0.6132,
               "box": {
-                "x": 383.68,
-                "y": 236.85,
-                "width": 78.47,
-                "height": 58.05
+                "x": 248.3,
+                "y": 426.7,
+                "width": 66.33,
+                "height": 75.4
               },
-              "area": 4554.68
+              "area": 5001.33
             },
             {
               "label": "mr_noodles_competitor",
               "classId": 1,
               "category": "competitor",
-              "confidence": 0.5393,
+              "confidence": 0.6084,
               "box": {
-                "x": 44.29,
-                "y": 167.39,
-                "width": 42.83,
-                "height": 69.81
+                "x": 44.47,
+                "y": 178.09,
+                "width": 40.34,
+                "height": 59.62
               },
-              "area": 2990.16
+              "area": 2405.46
+            },
+            {
+              "label": "mr_noodles_competitor",
+              "classId": 1,
+              "category": "competitor",
+              "confidence": 0.5997,
+              "box": {
+                "x": 306.27,
+                "y": 131.88,
+                "width": 86.41,
+                "height": 52.04
+              },
+              "area": 4496.5
+            },
+            {
+              "label": "mr_noodles_competitor",
+              "classId": 1,
+              "category": "competitor",
+              "confidence": 0.59,
+              "box": {
+                "x": 259.76,
+                "y": 325.25,
+                "width": 80.62,
+                "height": 45.55
+              },
+              "area": 3672.21
             }
           ],
-          "overlayImageUrl": "http://localhost:8001/artifacts/overlays/visit_demo_001_567c33fe_overlay.jpg"
+          "overlayImageUrl": "http://localhost:8001/artifacts/overlays/visit_demo_001_be49222a_overlay.jpg"
         },
-        "llm": null,
+        "llm": {
+          "provider": "openai",
+          "model": "gpt-5.4-mini",
+          "posm": {
+            "detected": false,
+            "confidence": 0.07,
+            "evidence": "No clearly visible Olympic-branded POSM in the shelf area; visible promotional items are for other brands (e.g., Nescafe and generic store strips).",
+            "missingReason": "Olympic-branded POSM is not visible in the image."
+          },
+          "otherPromotionalMaterial": "Visible non-Olympic promotional material includes Nescafe hanging sign and multiple branded shelf strips/signage from other brands.",
+          "shelfQuality": "Moderate to poor: shelf is crowded and cluttered, with limited face-up visibility for products.",
+          "visibilityNotes": "Olympic visibility is absent (0.0 area ratio). Products near the front counter are densely packed, reducing easy identification.",
+          "competitorNotes": "Competitor products visually dominate the shelf space, with 24 detected competitor items and strong brand blocking across multiple shelves.",
+          "supervisorSummary": "No Olympic POSM visible; clear shelf space near front counter and add Olympic branding.",
+          "recommendedAction": "Visit outlet, secure front-counter shelf edge, install Olympic POSM, and front-face Olympic products for immediate visibility.",
+          "raw": {
+            "posm": {
+              "detected": false,
+              "confidence": 0.07,
+              "evidence": "No clearly visible Olympic-branded POSM in the shelf area; visible promotional items are for other brands (e.g., Nescafe and generic store strips).",
+              "missingReason": "Olympic-branded POSM is not visible in the image."
+            },
+            "shelfQuality": "Moderate to poor: shelf is crowded and cluttered, with limited face-up visibility for products.",
+            "otherPromotionalMaterial": "Visible non-Olympic promotional material includes Nescafe hanging sign and multiple branded shelf strips/signage from other brands.",
+            "visibilityNotes": "Olympic visibility is absent (0.0 area ratio). Products near the front counter are densely packed, reducing easy identification.",
+            "competitorNotes": "Competitor products visually dominate the shelf space, with 24 detected competitor items and strong brand blocking across multiple shelves.",
+            "supervisorSummary": "No Olympic POSM visible; clear shelf space near front counter and add Olympic branding.",
+            "recommendedAction": "Visit outlet, secure front-counter shelf edge, install Olympic POSM, and front-face Olympic products for immediate visibility."
+          }
+        },
         "compliance": {
-          "score": 10,
+          "score": 0,
           "status": "critical",
           "reasons": [
             "No Olympic products were detected.",
             "Olympic visibility is below the minimum target.",
-            "Competitor products dominate visible shelf space."
+            "Competitor products dominate visible shelf space.",
+            "POSM was not detected in the shelf image."
           ],
           "recommendedAction": "Request a revisit with improved Olympic shelf visibility and clearer merchandising evidence."
         },
-        "supervisorSummary": "Outlet is failing compliance because no Olympic products were detected and competitor presence is high.",
+        "supervisorSummary": "No Olympic POSM visible; clear shelf space near front counter and add Olympic branding.",
         "warnings": []
       },
-      "createdAt": "2026-05-21T12:59:30.646Z",
+      "createdAt": "2026-05-21T18:12:01.661Z",
       "outcomeSummary": {
         "visitId": "visit_demo_001",
         "outletName": "Rahim Store",
         "finalStatus": "FLAGGED",
-        "complianceScore": 10,
+        "complianceScore": 0,
         "complianceStatus": "critical",
         "complianceReasons": [
           "No Olympic products were detected.",
           "Olympic visibility is below the minimum target.",
-          "Competitor products dominate visible shelf space."
+          "Competitor products dominate visible shelf space.",
+          "POSM was not detected in the shelf image."
         ],
-        "supervisorSummary": "Outlet is failing compliance because no Olympic products were detected and competitor presence is high.",
+        "supervisorSummary": "No Olympic POSM visible; clear shelf space near front counter and add Olympic branding.",
         "recommendedAction": "Request a revisit with improved Olympic shelf visibility and clearer merchandising evidence.",
         "counts": {
           "olympic": 0,
-          "competitor": 22,
-          "total": 22
+          "competitor": 24,
+          "total": 24
         },
         "visibilityRatio": 0,
         "posm": {
-          "detected": null,
-          "evidence": "POSM analysis not available."
+          "detected": false,
+          "evidence": "No clearly visible Olympic-branded POSM in the shelf area; visible promotional items are for other brands (e.g., Nescafe and generic store strips).",
+          "missingReason": "Olympic-branded POSM is not visible in the image."
         },
         "fraudSignals": []
       }
@@ -710,35 +800,41 @@
     {
       "visitId": "visit_demo_001",
       "outletId": "outlet_rahim_store",
-      "title": "Rahim Store visit compliance 10",
-      "summary": "Outlet is failing compliance because no Olympic products were detected and competitor presence is high.",
-      "retrievalText": "Outlet: Rahim Store\nOutlet ID: outlet_rahim_store\nVisit ID: visit_demo_001\nRep ID: rep_ayesha\nCompliance Score: 10\nCompliance Status: critical\nSupervisor Summary: Outlet is failing compliance because no Olympic products were detected and competitor presence is high.\nOlympic Products Detected: 0\nCompetitors Detected: 22\nOlympic Visibility Ratio: 0\nPOSM Detected: unknown\nPOSM Evidence: LLM POSM analysis not available.\nFraud Signals: No fraud signals detected.\nRecommended Action: Request a revisit with improved Olympic shelf visibility and clearer merchandising evidence.",
+      "title": "Rahim Store visit compliance 0",
+      "summary": "No Olympic POSM visible; clear shelf space near front counter and add Olympic branding.",
+      "retrievalText": "Outlet: Rahim Store\nOutlet ID: outlet_rahim_store\nVisit ID: visit_demo_001\nRep ID: rep_ayesha\nCompliance Score: 0\nCompliance Status: critical\nSupervisor Summary: No Olympic POSM visible; clear shelf space near front counter and add Olympic branding.\nOlympic Products Detected: 0\nCompetitors Detected: 24\nOlympic Visibility Ratio: 0\nPOSM Detected: false\nPOSM Evidence: No clearly visible Olympic-branded POSM in the shelf area; visible promotional items are for other brands (e.g., Nescafe and generic store strips).\nFraud Signals: No fraud signals detected.\nRecommended Action: Request a revisit with improved Olympic shelf visibility and clearer merchandising evidence.",
       "facts": {
         "compliance": {
-          "score": 10,
+          "score": 0,
           "status": "critical",
           "reasons": [
             "No Olympic products were detected.",
             "Olympic visibility is below the minimum target.",
-            "Competitor products dominate visible shelf space."
+            "Competitor products dominate visible shelf space.",
+            "POSM was not detected in the shelf image."
           ],
           "recommendedAction": "Request a revisit with improved Olympic shelf visibility and clearer merchandising evidence."
         },
         "counts": {
           "olympic": 0,
-          "competitor": 22,
-          "total": 22
+          "competitor": 24,
+          "total": 24
         },
         "metrics": {
           "countRatio": 0,
           "visibilityRatio": 0,
           "olympicAreaRatio": 0,
-          "competitorAreaRatio": 0.1541
+          "competitorAreaRatio": 0.1689
         },
-        "posm": null,
+        "posm": {
+          "detected": false,
+          "confidence": 0.07,
+          "evidence": "No clearly visible Olympic-branded POSM in the shelf area; visible promotional items are for other brands (e.g., Nescafe and generic store strips).",
+          "missingReason": "Olympic-branded POSM is not visible in the image."
+        },
         "fraudSignals": []
       },
-      "createdAt": "2026-05-21T12:59:30.646Z"
+      "createdAt": "2026-05-21T18:12:01.661Z"
     }
   ],
   "eventLog": [
@@ -1027,6 +1123,108 @@
         }
       },
       "createdAt": "2026-05-21T12:59:30.653Z"
+    },
+    {
+      "visitId": "visit_demo_001",
+      "event": "ANALYZE_VISIT_STARTED",
+      "level": "info",
+      "traceId": "dry_run_1779387075453",
+      "metadata": {},
+      "createdAt": "2026-05-21T18:11:15.453Z"
+    },
+    {
+      "visitId": "visit_demo_001",
+      "event": "ANALYZE_VISIT_COMPLETED",
+      "level": "info",
+      "traceId": "dry_run_1779387075453",
+      "metadata": {
+        "durationMs": 5183,
+        "complianceScore": 0,
+        "finalStatus": "FLAGGED",
+        "fraudSignalCount": 0,
+        "analysisSource": "YOLO",
+        "outcomeSummary": {
+          "visitId": "visit_demo_001",
+          "outletName": "Rahim Store",
+          "finalStatus": "FLAGGED",
+          "complianceScore": 0,
+          "complianceStatus": "critical",
+          "complianceReasons": [
+            "No Olympic products were detected.",
+            "Olympic visibility is below the minimum target.",
+            "Competitor products dominate visible shelf space.",
+            "POSM was not detected in the shelf image."
+          ],
+          "supervisorSummary": "No Olympic POSM visible; competitor display dominates near counter.",
+          "recommendedAction": "Request a revisit with improved Olympic shelf visibility and clearer merchandising evidence.",
+          "counts": {
+            "olympic": 0,
+            "competitor": 24,
+            "total": 24
+          },
+          "visibilityRatio": 0,
+          "posm": {
+            "detected": false,
+            "evidence": "No clearly visible Olympic-branded POSM. Visible promotional material is mainly Nescafe and other non-Olympic brand signage.",
+            "missingReason": "Olympic branding is not visible in the shelf area."
+          },
+          "fraudSignals": []
+        }
+      },
+      "createdAt": "2026-05-21T18:11:20.636Z"
+    },
+    {
+      "visitId": "visit_demo_001",
+      "jobId": "analyze-visit_demo_001",
+      "event": "ANALYZE_VISIT_STARTED",
+      "level": "info",
+      "traceId": "trace_1779387117236",
+      "metadata": {
+        "queue": "analyze_visit"
+      },
+      "createdAt": "2026-05-21T18:11:57.271Z"
+    },
+    {
+      "visitId": "visit_demo_001",
+      "jobId": "analyze-visit_demo_001",
+      "event": "ANALYZE_VISIT_COMPLETED",
+      "level": "info",
+      "traceId": "trace_1779387117236",
+      "metadata": {
+        "durationMs": 4400,
+        "complianceScore": 0,
+        "finalStatus": "FLAGGED",
+        "fraudSignalCount": 0,
+        "analysisSource": "YOLO",
+        "outcomeSummary": {
+          "visitId": "visit_demo_001",
+          "outletName": "Rahim Store",
+          "finalStatus": "FLAGGED",
+          "complianceScore": 0,
+          "complianceStatus": "critical",
+          "complianceReasons": [
+            "No Olympic products were detected.",
+            "Olympic visibility is below the minimum target.",
+            "Competitor products dominate visible shelf space.",
+            "POSM was not detected in the shelf image."
+          ],
+          "supervisorSummary": "No Olympic POSM visible; clear shelf space near front counter and add Olympic branding.",
+          "recommendedAction": "Request a revisit with improved Olympic shelf visibility and clearer merchandising evidence.",
+          "counts": {
+            "olympic": 0,
+            "competitor": 24,
+            "total": 24
+          },
+          "visibilityRatio": 0,
+          "posm": {
+            "detected": false,
+            "evidence": "No clearly visible Olympic-branded POSM in the shelf area; visible promotional items are for other brands (e.g., Nescafe and generic store strips).",
+            "missingReason": "Olympic-branded POSM is not visible in the image."
+          },
+          "fraudSignals": []
+        }
+      },
+      "createdAt": "2026-05-21T18:12:01.671Z"
     }
   ]
 }
