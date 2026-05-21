@@ -65,12 +65,42 @@ export type DashboardData = {
   outletsBelowThreshold: number;
   visits: VisitListItem[];
   needsAttention: VisitListItem[];
+  recentVisits: VisitListItem[];
+  summary: DashboardSummary;
+  trend: DashboardTrendPoint[];
+};
+
+export type DashboardSummary = {
+  rangeDays: number;
+  visitsToday: number;
+  visitsDeltaPct: number;
+  avgComplianceScore: number;
+  previousAvgComplianceScore: number;
+  avgComplianceDeltaPct: number;
+  missingPosmCount: number;
+  fraudDetectionCount: number;
+  flaggedFraudCount: number;
+  posmCompliancePct: number;
+  posmComplianceDeltaPct: number;
+  qualityScore: number;
+  qualityDeltaPct: number;
+};
+
+export type DashboardTrendPoint = {
+  date: string;
+  visits: number;
+  avgComplianceScore: number;
+  posmCompliancePct: number;
+  qualityScore: number;
+  fraudDetections: number;
+  missingPosm: number;
 };
 
 export type VisitListItem = {
   id: string;
   status: VisitStatus;
   createdAt: string;
+  timestamp: string;
   outletName: string;
   outletCode: string;
   repName: string;
@@ -79,6 +109,8 @@ export type VisitListItem = {
   supervisorSummary: string | null;
   fraudCount: number;
   hasHighFraud: boolean;
+  hasMissingPosm: boolean;
+  riskStatus: "SAFE" | "REVIEW_NEEDED" | "HIGH_RISK";
 };
 
 export const TERMINAL_STATUSES: VisitStatus[] = ["COMPLETE", "FLAGGED", "FAILED"];

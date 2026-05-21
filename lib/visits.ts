@@ -58,17 +58,56 @@ export function serializeVisitDetail(visit: VisitWithRelations): VisitDetail {
 export function serializeVisitListItem(visit: VisitWithRelations): VisitListItem {
   const outcome = visit.aiResult?.outcomeSummary as OutcomeSummary | null;
   const highFraud = visit.fraudSignals.some((f) => f.severity === "HIGH");
+  const complianceScore = visit.aiResult?.complianceScore ?? null;
+  const hasMissingPosm = posmDetected(visit.aiResult?.posm) === false || outcome?.posm.detected === false;
+  const riskStatus = riskStatusForVisit({
+    visitStatus: visit.status,
+    complianceScore,
+    fraudCount: visit.fraudSignals.length,
+    highFraud,
+    hasMissingPosm,
+  });
+
   return {
     id: visit.id,
     status: visit.status,
     createdAt: visit.createdAt.toISOString(),
+    timestamp: visit.createdAt.toISOString(),
     outletName: visit.outlet.name,
     outletCode: visit.outlet.code,
     repName: visit.rep.name,
-    complianceScore: visit.aiResult?.complianceScore ?? null,
+    complianceScore,
     complianceStatus: visit.aiResult?.status ?? outcome?.complianceStatus ?? null,
     supervisorSummary: visit.aiResult?.supervisorSummary ?? outcome?.supervisorSummary ?? null,
     fraudCount: visit.fraudSignals.length,
     hasHighFraud: highFraud,
+    hasMissingPosm,
+    riskStatus,
   };
+}
+
+function posmDetected(posm: unknown): boolean | null {
+  if (!posm || typeof posm !== "object") return null;
+  const detected = (posm as { detected?: unknown }).detected;
+  return typeof detected === "boolean" ? detected : null;
+}
+
+function riskStatusForVisit({
+  visitStatus,
+  complianceScore,
+  fraudCount,
+  highFraud,
+  hasMissingPosm,
+}: {
+  visitStatus: string;
+  complianceScore: number | null;
+  fraudCount: number;
+  highFraud: boolean;
+  hasMissingPosm: boolean;
+}): VisitListItem["riskStatus"] {
+  if (highFraud || (complianceScore !== null && complianceScore < 50)) return "HIGH_RISK";
+  if (visitStatus === "FLAGGED" || fraudCount > 0 || hasMissingPosm || (complianceScore !== null && complianceScore < 70)) {
+    return "REVIEW_NEEDED";
+  }
+  return "SAFE";
 }
