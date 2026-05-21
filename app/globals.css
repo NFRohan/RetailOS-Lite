@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -6,25 +6,25 @@
 
 @layer base {
   :root {
-    --font-dm-sans: "DM Sans", system-ui, sans-serif;
-    --background: 210 40% 98%;
-    --foreground: 222 47% 11%;
+    --font-inter: "Inter", system-ui, sans-serif;
+    --background: 232 41% 96%;
+    --foreground: 198 93% 12%;
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --primary: 43 96% 48%;
-    --primary-foreground: 222 47% 11%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 43 96% 48%;
-    --accent-foreground: 222 47% 11%;
+    --card-foreground: 198 93% 12%;
+    --primary: 195 93% 12%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 188 64% 34%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 225 38% 91%;
+    --muted-foreground: 196 9% 28%;
+    --accent: 204 78% 85%;
+    --accent-foreground: 195 93% 12%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 43 96% 48%;
-    --radius: 0.625rem;
+    --border: 225 18% 78%;
+    --input: 225 18% 78%;
+    --ring: 188 64% 34%;
+    --radius: 0.75rem;
   }
 
   .dark {
@@ -55,6 +55,12 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
   }
+}
+
+.app-surface {
+  background:
+    radial-gradient(circle at top right, rgba(191, 219, 247, 0.32), transparent 28rem),
+    linear-gradient(180deg, #f9f9ff 0%, #eef2fb 100%);
 }
 
 .mesh-gradient {

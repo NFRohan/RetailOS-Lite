@@ -11,15 +11,17 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        navy: "#0B1220",
+        navy: "#022B3A",
         gold: {
-          DEFAULT: "#F5B301",
-          foreground: "#0B1220",
+          DEFAULT: "#1F7A8C",
+          foreground: "#FFFFFF",
         },
+        teal: "#1F7A8C",
+        ice: "#E1E5F2",
         olympic: "#E8A317",
         competitor: "#E07A5F",
         rep: {
-          bg: "#F8FAFC",
+          bg: "#F4F7FB",
         },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -52,7 +54,7 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ["var(--font-dm-sans)", "system-ui", "sans-serif"],
+        sans: ["var(--font-inter)", "system-ui", "sans-serif"],
       },
       borderRadius: {
         lg: "var(--radius)",
