@@ -8,6 +8,7 @@ BullMQ worker for async visit analysis.
 analyze_visit job
   -> load visit/images
   -> contextual fraud checks
+  -> EXIF GPS/time checks when image metadata exists
   -> call FastAPI /analyze-shelf
   -> save AIResult
   -> save FraudSignal rows
@@ -51,6 +52,7 @@ Compliance reasons:
 - POSM was not detected in the shelf image.
 Fraud signals:
 - LOW IMAGE_HASHED: Image SHA-256 hash computed for duplicate detection.
+- MEDIUM EXIF_GPS_MISMATCH: Image EXIF GPS location does not match the submitted visit location.
 ```
 
 ## Run With BullMQ
