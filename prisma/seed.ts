@@ -1,6 +1,5 @@
 import { PrismaClient } from "@prisma/client";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();

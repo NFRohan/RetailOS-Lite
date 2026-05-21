@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { cn, hashFileSha256 } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 type Props = {
   rawUrl: string;

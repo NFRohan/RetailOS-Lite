@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import type {
   AIResultRecord,
   EventLogRecord,
@@ -56,7 +56,10 @@ export class PrismaVisitRepository implements VisitRepository {
   async updateVisitImage(image: VisitImage): Promise<void> {
     await this.prisma.visitImage.update({
       where: { id: image.id },
-      data: { imageHash: image.imageHash },
+      data: {
+        imageHash: image.imageHash,
+        metadata: jsonOrUndefined(image.metadata),
+      },
     });
   }
 
@@ -92,7 +95,7 @@ export class PrismaVisitRepository implements VisitRepository {
             type: signal.type,
             severity: signal.severity,
             message: signal.message,
-            metadata: signal.metadata ?? undefined,
+            metadata: jsonOrUndefined(signal.metadata),
             createdAt: new Date(signal.createdAt),
           },
         });
@@ -111,13 +114,13 @@ export class PrismaVisitRepository implements VisitRepository {
         complianceScore: result.complianceScore,
         status: result.status,
         supervisorSummary: result.supervisorSummary,
-        yoloDetections: result.yoloDetections ?? undefined,
-        detectedProducts: result.detectedProducts as object,
-        competitors: result.competitors as object,
-        posm: result.posm ?? undefined,
+        yoloDetections: jsonOrUndefined(result.yoloDetections),
+        detectedProducts: jsonValue(result.detectedProducts),
+        competitors: jsonValue(result.competitors),
+        posm: jsonOrUndefined(result.posm),
         overlayImageUrl: result.overlayImageUrl,
-        outcomeSummary: result.outcomeSummary ?? undefined,
-        rawModelOutput: result.rawModelOutput as object,
+        outcomeSummary: jsonOrUndefined(result.outcomeSummary),
+        rawModelOutput: jsonValue(result.rawModelOutput),
         createdAt: new Date(result.createdAt),
       },
       update: {
@@ -127,13 +130,13 @@ export class PrismaVisitRepository implements VisitRepository {
         complianceScore: result.complianceScore,
         status: result.status,
         supervisorSummary: result.supervisorSummary,
-        yoloDetections: result.yoloDetections ?? undefined,
-        detectedProducts: result.detectedProducts as object,
-        competitors: result.competitors as object,
-        posm: result.posm ?? undefined,
+        yoloDetections: jsonOrUndefined(result.yoloDetections),
+        detectedProducts: jsonValue(result.detectedProducts),
+        competitors: jsonValue(result.competitors),
+        posm: jsonOrUndefined(result.posm),
         overlayImageUrl: result.overlayImageUrl,
-        outcomeSummary: result.outcomeSummary ?? undefined,
-        rawModelOutput: result.rawModelOutput as object,
+        outcomeSummary: jsonOrUndefined(result.outcomeSummary),
+        rawModelOutput: jsonValue(result.rawModelOutput),
       },
     });
   }
@@ -147,14 +150,14 @@ export class PrismaVisitRepository implements VisitRepository {
         title: report.title,
         summary: report.summary,
         retrievalText: report.retrievalText,
-        facts: report.facts,
+        facts: jsonValue(report.facts),
         createdAt: new Date(report.createdAt),
       },
       update: {
         title: report.title,
         summary: report.summary,
         retrievalText: report.retrievalText,
-        facts: report.facts,
+        facts: jsonValue(report.facts),
       },
     });
   }
@@ -167,9 +170,17 @@ export class PrismaVisitRepository implements VisitRepository {
         event: event.event,
         level: event.level,
         traceId: event.traceId,
-        metadata: event.metadata ?? undefined,
+        metadata: jsonOrUndefined(event.metadata),
         createdAt: new Date(event.createdAt),
       },
     });
   }
+}
+
+function jsonValue(value: unknown): Prisma.InputJsonValue {
+  return value as Prisma.InputJsonValue;
+}
+
+function jsonOrUndefined(value: unknown): Prisma.InputJsonValue | undefined {
+  return value === undefined || value === null ? undefined : jsonValue(value);
 }

@@ -7,7 +7,7 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "worker": "tsx worker/src/index.ts",
     "worker:enqueue-demo": "tsx worker/src/scripts/enqueueDemo.ts",
     "worker:dry-run": "tsx worker/src/scripts/dryRunAnalyzeVisit.ts",
