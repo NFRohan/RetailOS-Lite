@@ -2,6 +2,10 @@
 
 This backend slice is ready for the Next.js teammate to integrate against.
 
+For the complete implemented API/data contract, see [IMPLEMENTED_SYSTEM_REFERENCE.md](IMPLEMENTED_SYSTEM_REFERENCE.md).
+
+For remaining work, deliverables, DoD, and test setup, see [REMAINING_SPRINT_PLAN.md](REMAINING_SPRINT_PLAN.md).
+
 ## What Is Stable
 
 ### AI Service
