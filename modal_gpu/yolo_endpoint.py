@@ -8,6 +8,7 @@ import modal
 APP_NAME = "retailos-yolo-gpu"
 REMOTE_MODEL_PATH = "/root/models/best.pt"
 LOCAL_MODEL_PATH = Path(__file__).resolve().parents[1] / "Detection Model" / "best.pt"
+DEFAULT_IMAGE_SIZE = 1280
 
 
 image = (
@@ -60,7 +61,7 @@ class YoloGpuEndpoint:
 
         visit_id = payload.get("visitId")
         confidence = float(payload.get("confidence", 0.25))
-        image_size = int(payload.get("imageSize", 640))
+        image_size = int(payload.get("imageSize", DEFAULT_IMAGE_SIZE))
 
         image_bytes = base64.b64decode(image_base64)
         image_array = np.frombuffer(image_bytes, dtype=np.uint8)
@@ -130,6 +131,7 @@ class YoloGpuEndpoint:
             "imageWidth": image_width,
             "imageHeight": image_height,
             "confidenceThreshold": confidence,
+            "inputImageSize": image_size,
             "inferenceMs": inference_ms,
             "counts": {
                 "olympic": olympic_count,
@@ -150,4 +152,3 @@ class YoloGpuEndpoint:
             "detections": detections,
             "overlayImageUrl": None,
         }
-

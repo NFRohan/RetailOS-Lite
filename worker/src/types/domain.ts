@@ -4,7 +4,13 @@ export type FraudSeverity = "LOW" | "MEDIUM" | "HIGH";
 
 export type FraudSignal = {
   visitId: string;
-  type: "DUPLICATE_IMAGE" | "GPS_MISMATCH" | "TIMESTAMP_ANOMALY" | "IMAGE_HASHED";
+  type:
+    | "DUPLICATE_IMAGE"
+    | "GPS_MISMATCH"
+    | "TIMESTAMP_ANOMALY"
+    | "IMAGE_HASHED"
+    | "EXIF_GPS_MISMATCH"
+    | "EXIF_TIMESTAMP_ANOMALY";
   severity: FraudSeverity;
   message: string;
   metadata?: Record<string, unknown>;

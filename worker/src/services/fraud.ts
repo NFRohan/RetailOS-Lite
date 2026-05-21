@@ -2,12 +2,20 @@ import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import exifr from "exifr";
 import { config } from "../config.js";
 import type { FraudSignal, Visit, VisitImage } from "../types/domain.js";
 import type { VisitRepository } from "../repositories/visitRepository.js";
 
 const nowIso = () => new Date().toISOString();
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+
+type ExifMetadata = {
+  latitude?: number;
+  longitude?: number;
+  capturedAt?: string;
+  sourceFields: string[];
+};
 
 export async function runContextualFraudChecks(
   visit: Visit,
@@ -16,6 +24,7 @@ export async function runContextualFraudChecks(
   const signals: FraudSignal[] = [];
 
   signals.push(...(await hashAndDuplicateSignals(visit, repository)));
+  signals.push(...(await exifSignals(visit, repository)));
   const gpsSignal = gpsMismatchSignal(visit);
   if (gpsSignal) signals.push(gpsSignal);
   const timestampSignal = timestampAnomalySignal(visit);
@@ -31,8 +40,11 @@ async function hashAndDuplicateSignals(
   const signals: FraudSignal[] = [];
 
   for (const image of visit.images) {
-    if (!image.imageHash && image.localPath) {
-      const imageHash = await sha256ForLocalPath(image.localPath);
+    if (!image.imageHash) {
+      const imageBuffer = await imageBufferFor(image);
+      if (!imageBuffer) continue;
+
+      const imageHash = sha256(imageBuffer);
       const updatedImage: VisitImage = { ...image, imageHash };
       await repository.updateVisitImage(updatedImage);
       image.imageHash = imageHash;
@@ -68,10 +80,119 @@ async function hashAndDuplicateSignals(
   return signals;
 }
 
-async function sha256ForLocalPath(localPath: string): Promise<string> {
+async function exifSignals(
+  visit: Visit,
+  repository: VisitRepository,
+): Promise<FraudSignal[]> {
+  const signals: FraudSignal[] = [];
+
+  for (const image of visit.images) {
+    const imageBuffer = await imageBufferFor(image);
+    if (!imageBuffer) continue;
+
+    const exif = await readExifMetadata(imageBuffer);
+    if (!exif) continue;
+
+    await repository.updateVisitImage({
+      ...image,
+      metadata: {
+        ...image.metadata,
+        exif,
+      },
+    });
+
+    const gpsSignal = exifGpsMismatchSignal(visit, image, exif);
+    if (gpsSignal) signals.push(gpsSignal);
+
+    const timestampSignal = exifTimestampAnomalySignal(visit, image, exif);
+    if (timestampSignal) signals.push(timestampSignal);
+  }
+
+  return signals;
+}
+
+async function imageBufferFor(image: VisitImage): Promise<Buffer | null> {
+  if (image.localPath) {
+    return readLocalImageBuffer(image.localPath);
+  }
+
+  if (image.url?.startsWith("http://") || image.url?.startsWith("https://")) {
+    return downloadImageBuffer(image.url);
+  }
+
+  return null;
+}
+
+async function readLocalImageBuffer(localPath: string): Promise<Buffer> {
   const resolved = path.isAbsolute(localPath) ? localPath : path.join(rootDir, localPath);
-  const buffer = await fs.readFile(resolved);
+  return fs.readFile(resolved);
+}
+
+async function downloadImageBuffer(url: string): Promise<Buffer | null> {
+  try {
+    const response = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+    if (!response.ok) return null;
+    const arrayBuffer = await response.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+  } catch {
+    return null;
+  }
+}
+
+function sha256(buffer: Buffer): string {
   return crypto.createHash("sha256").update(buffer).digest("hex");
+}
+
+async function readExifMetadata(imageBuffer: Buffer): Promise<ExifMetadata | null> {
+  try {
+    const raw = await exifr.parse(imageBuffer, {
+      tiff: true,
+      ifd0: {},
+      exif: true,
+      gps: true,
+      makerNote: false,
+      mergeOutput: true,
+      reviveValues: true,
+    });
+
+    if (!raw || typeof raw !== "object") return null;
+
+    const sourceFields = Object.keys(raw);
+    const latitude = numberFrom(raw.latitude ?? raw.GPSLatitude);
+    const longitude = numberFrom(raw.longitude ?? raw.GPSLongitude);
+    const capturedAt = dateFrom(
+      raw.DateTimeOriginal ?? raw.CreateDate ?? raw.DateTime ?? raw.ModifyDate ?? raw["36867"] ?? raw["306"],
+    );
+
+    if (latitude === undefined && longitude === undefined && !capturedAt) return null;
+
+    return {
+      latitude,
+      longitude,
+      capturedAt: capturedAt?.toISOString(),
+      sourceFields,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function numberFrom(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
+
+function dateFrom(value: unknown): Date | undefined {
+  if (value instanceof Date && Number.isFinite(value.getTime())) return value;
+  if (typeof value !== "string") return undefined;
+
+  const normalized = value.trim().replace(/^(\d{4}):(\d{2}):(\d{2})/, "$1-$2-$3");
+  const parsed = new Date(normalized);
+  return Number.isFinite(parsed.getTime()) ? parsed : undefined;
 }
 
 function gpsMismatchSignal(visit: Visit): FraudSignal | null {
@@ -100,6 +221,90 @@ function gpsMismatchSignal(visit: Visit): FraudSignal | null {
       outletLng: longitude,
       checkInLat: visit.checkInLat,
       checkInLng: visit.checkInLng,
+    },
+    createdAt: nowIso(),
+  };
+}
+
+function exifGpsMismatchSignal(
+  visit: Visit,
+  image: VisitImage,
+  exif: ExifMetadata,
+): FraudSignal | null {
+  if (exif.latitude === undefined || exif.longitude === undefined) return null;
+
+  const reference =
+    visit.checkInLat !== undefined && visit.checkInLng !== undefined
+      ? {
+          type: "check_in",
+          latitude: visit.checkInLat,
+          longitude: visit.checkInLng,
+        }
+      : visit.outlet.latitude !== undefined && visit.outlet.longitude !== undefined
+        ? {
+            type: "outlet",
+            latitude: visit.outlet.latitude,
+            longitude: visit.outlet.longitude,
+          }
+        : null;
+
+  if (!reference) return null;
+
+  const distanceMeters = haversineMeters(
+    reference.latitude,
+    reference.longitude,
+    exif.latitude,
+    exif.longitude,
+  );
+  if (distanceMeters <= config.fraudExifGpsThresholdMeters) return null;
+
+  return {
+    visitId: visit.id,
+    type: "EXIF_GPS_MISMATCH",
+    severity: distanceMeters > config.fraudExifGpsThresholdMeters * 3 ? "HIGH" : "MEDIUM",
+    message: "Image EXIF GPS location does not match the submitted visit location.",
+    metadata: {
+      imageId: image.id,
+      referenceType: reference.type,
+      distanceMeters: Math.round(distanceMeters),
+      thresholdMeters: config.fraudExifGpsThresholdMeters,
+      exifLat: exif.latitude,
+      exifLng: exif.longitude,
+      referenceLat: reference.latitude,
+      referenceLng: reference.longitude,
+    },
+    createdAt: nowIso(),
+  };
+}
+
+function exifTimestampAnomalySignal(
+  visit: Visit,
+  image: VisitImage,
+  exif: ExifMetadata,
+): FraudSignal | null {
+  if (!exif.capturedAt) return null;
+
+  const referenceTimestamp = visit.clientTimestamp ?? visit.serverCreatedAt;
+  if (!referenceTimestamp) return null;
+
+  const exifTime = new Date(exif.capturedAt).getTime();
+  const referenceTime = new Date(referenceTimestamp).getTime();
+  if (!Number.isFinite(exifTime) || !Number.isFinite(referenceTime)) return null;
+
+  const driftHours = Math.abs(referenceTime - exifTime) / (1000 * 60 * 60);
+  if (driftHours <= config.fraudExifTimestampDriftHours) return null;
+
+  return {
+    visitId: visit.id,
+    type: "EXIF_TIMESTAMP_ANOMALY",
+    severity: driftHours > config.fraudExifTimestampDriftHours * 2 ? "HIGH" : "MEDIUM",
+    message: "Image EXIF capture time is far from the submitted visit timestamp.",
+    metadata: {
+      imageId: image.id,
+      exifCapturedAt: exif.capturedAt,
+      referenceTimestamp,
+      driftHours: Number(driftHours.toFixed(2)),
+      thresholdHours: config.fraudExifTimestampDriftHours,
     },
     createdAt: nowIso(),
   };
@@ -154,4 +359,3 @@ function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number)
       Math.sin(dLon / 2);
   return radiusMeters * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
-

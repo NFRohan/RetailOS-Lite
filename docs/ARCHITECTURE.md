@@ -1,973 +1,447 @@
 # RetailOS Lite Architecture
 
-## Product Positioning
+RetailOS Lite is a 72-hour AI-native retail execution workflow.
 
-RetailOS Lite is a 72-hour AI-native field execution workflow for retail visibility audits.
+The core product story:
 
-The product story is simple:
+1. A rep checks in at an outlet with GPS, timestamp, notes, and shelf images.
+2. The app stores the visit and enqueues async analysis.
+3. AI detects Olympic products, competitor presence, POSM evidence, and fraud signals.
+4. Supervisors see compliance scores, reasons, image history, and AI summaries.
+5. An assistant can answer operational questions from previous visit reports.
 
-1. A sales representative visits an outlet.
-2. They check in with GPS, timestamp, outlet metadata, and shelf photos.
-3. AI analyzes shelf visibility, competitor presence, POSM/compliance signals, and possible fraud.
-4. Supervisors see visit quality, risk, compliance scores, summaries, and alerts in a dashboard.
+This document is intentionally high level. Detailed API contracts and sprint tasks live in:
 
-The evaluator should immediately see speed, business workflow, AI usage, and production-shaped architecture.
+- [Implemented System Reference](IMPLEMENTED_SYSTEM_REFERENCE.md)
+- [Backend Handoff](BACKEND_HANDOFF.md)
+- [Remaining Sprint Plan](REMAINING_SPRINT_PLAN.md)
+- [Modal GPU Inference](MODAL_GPU_INFERENCE.md)
+- [YOLO Inference Pipeline](YOLO_INFERENCE_PIPELINE.md)
+
+## Architecture Goals
+
+- Prioritize the retail workflow over technical novelty.
+- Keep user-facing requests fast by pushing heavy AI work to queues.
+- Use YOLO for trained product detection and LLM vision for untrained visual reasoning.
+- Store structured outputs first, prose second.
+- Make every flagged visit explainable with reasons.
+- Keep local fallback paths so demo risk stays low.
+- Show production-shaped engineering with async queues, Modal GPU, and observability.
+
+## System Diagram
+
+```text
+Rep Web/PWA
+  |
+  v
+Next.js App
+  - visit workflow
+  - dashboard
+  - assistant
+  - API routes
+  |
+  +--> PostgreSQL + pgvector
+  |     - visits, images, ai_results
+  |     - fraud_signals, visit_reports
+  |
+  +--> Object Storage
+  |     - raw shelf images
+  |     - annotated overlays
+  |
+  +--> Redis / BullMQ
+        - analyze_visit
+        - embed_visit_report
+        - send_alert
+        |
+        v
+      Worker
+        - fraud checks
+        - AI service calls
+        - result persistence
+        |
+        v
+      FastAPI AI Service
+        - YOLO local or Modal GPU
+        - OpenAI POSM analysis
+        - compliance scoring
+        - supervisor summary
+```
 
 ## Recommended Stack
 
-### Frontend And Product Backend
+| Layer | Choice |
+| --- | --- |
+| Frontend | Next.js App Router, TypeScript, Tailwind |
+| Product backend | Next.js route handlers or server actions |
+| Auth/RBAC | Auth.js or sprint-speed credentials auth with server-side role checks |
+| Database | PostgreSQL with Prisma |
+| Vector search | pgvector |
+| Queue | Redis + BullMQ |
+| Worker | Node.js TypeScript worker |
+| AI service | FastAPI |
+| Product detection | YOLO model in `Detection Model/best.pt` |
+| GPU inference | Modal GPU endpoint |
+| POSM and summary | OpenAI vision model |
+| Storage | Supabase Storage, S3-compatible storage, or local dev storage |
+| Observability | OpenTelemetry + Grafana/Loki/Tempo/Metrics |
+| Deployment | Vercel, Railway/Render/Fly, Modal, managed Redis/Postgres |
 
-- Next.js App Router with TypeScript
-- Tailwind CSS plus a small component layer
-- Server Actions or route handlers for fast CRUD
-- NextAuth/Auth.js or simple credentials auth for role-based access
-- Prisma ORM
-- PostgreSQL, preferably Neon or Supabase for fast deployment
+## Core Services
 
-### AI And ML Service
+### Next.js App
 
-- FastAPI as the AI inference service, not the user-facing orchestrator
-- OpenAI/Gemini/Claude vision endpoint abstraction
-- YOLO detector for trained product/competitor detection
-- Optional Modal GPU backend for distributed YOLO inference
-- LLM fallback for shelf reasoning, POSM interpretation, and summaries
-- Image quality checks with OpenCV or Pillow
+Owns product workflow and supervisor UI.
 
-### Async Processing
+Responsibilities:
 
-- Redis
-- BullMQ worker in Node.js for visit analysis jobs
-- BullMQ worker owns analysis orchestration and calls FastAPI for heavy image inference
+- Auth and role-aware navigation.
+- Outlet selection.
+- GPS check-in.
+- Image upload.
+- Visit submit.
+- Dashboard and visit detail.
+- Assistant UI.
+- API routes that create visits, upload images, enqueue jobs, and read results.
 
-### Storage And Infra
+The Next.js request path should not run YOLO or call OpenAI directly for analysis.
 
-- Cloudinary or Supabase Storage for image uploads
-- Vercel for Next.js
-- Render/Fly.io/Railway for FastAPI AI service and worker processes
-- Upstash Redis for BullMQ
-- LGTM observability stack for demo/local systems visibility
-- Optional Sentry for frontend/runtime exception capture
+### BullMQ Worker
 
-### Observability
+Owns async visit analysis orchestration.
 
-- OpenTelemetry SDKs in Next.js API routes, queue workers, and FastAPI
-- Grafana for dashboards
-- Loki for logs
-- Tempo for traces
-- Prometheus or Mimir for metrics
-- Grafana Alloy or OTEL Collector for telemetry collection
+Responsibilities:
 
-## Architecture Diagram
+- Consume `analyze_visit`.
+- Load visit, outlet, and image records.
+- Run fraud checks.
+- Call FastAPI `/analyze-shelf`.
+- Persist AI results, fraud signals, visit reports, and event logs.
+- Mark visits `COMPLETE`, `FLAGGED`, or `FAILED`.
+- Enqueue `embed_visit_report`.
 
-```text
-Rep Mobile Web/PWA
-        |
-        v
-Next.js App
-  - Auth
-  - Visit forms
-  - Image upload
-  - Dashboard
-  - API routes
-        |
-        +--> PostgreSQL
-        |      - outlets
-        |      - visits
-        |      - images
-        |      - ai_results
-        |      - fraud_signals
-        |
-        +--> Cloudinary/Supabase Storage
-        |      - shelf images
-        |
-        +--> BullMQ Queue
-               - analyze_visit
-               - send_alert
-                    |
-                    v
-              Worker Process
-                    |
-                    v
-            FastAPI AI Service
-                - route YOLO to local model or Modal GPU
-                - LLM POSM analysis
-                - compliance scoring
-                - fraud checks
-                - summary generation
-                    |
-                    v
-              LGTM Observability
-                - traces
-                - logs
-                - metrics
-```
+### FastAPI AI Service
 
-## Distributed YOLO Inference
+Owns image intelligence and compliance logic.
 
-Use Modal GPU as the production/demo backend for YOLO inference, while keeping local YOLO as a fallback.
+Responsibilities:
+
+- Run YOLO locally or route inference to Modal GPU.
+- Generate overlay images.
+- Call OpenAI vision for Olympic POSM and shelf-quality reasoning.
+- Calculate compliance score and reasons.
+- Return structured JSON for the worker.
+
+### Modal GPU Endpoint
+
+Owns distributed YOLO inference.
+
+Responsibilities:
+
+- Load `best.pt` on a GPU container.
+- Accept base64 image payloads.
+- Return detections, counts, bounding boxes, and visibility metrics.
+- Default inference size is `1280`, matching the model setup.
+
+## End-To-End Flow
 
 ```text
-BullMQ analyze_visit worker
-        |
-        v
-FastAPI /analyze-shelf
-        |
-        +--> Modal GPU YOLO endpoint
-        |      - loads best.pt once per warm container
-        |      - returns detections/counts/visibility ratios
-        |
-        +--> Vision LLM POSM analysis
-        |
-        +--> Compliance scoring
+Rep submits visit
+  -> Next.js validates visit and image
+  -> Image is stored
+  -> Visit status becomes ANALYZING
+  -> BullMQ job analyze_visit is enqueued
+  -> Worker runs fraud checks
+  -> Worker calls FastAPI /analyze-shelf
+  -> FastAPI runs YOLO through local or Modal backend
+  -> FastAPI optionally runs OpenAI POSM analysis
+  -> FastAPI calculates compliance
+  -> Worker saves AI result, fraud signals, report text, and events
+  -> Visit becomes COMPLETE or FLAGGED
+  -> Dashboard displays reasons and recommendations
 ```
 
-Configuration:
+## Data Model Summary
 
-- `RETAILOS_YOLO_BACKEND=local`: use local `Detection Model/best.pt`
-- `RETAILOS_YOLO_BACKEND=modal`: send YOLO inference to Modal
-- `RETAILOS_MODAL_YOLO_URL`: deployed Modal endpoint URL
-- `RETAILOS_YOLO_FALLBACK_LOCAL=true`: fall back to local YOLO if Modal is unavailable
+Minimum tables:
 
-This makes the system genuinely distributed without changing the worker contract. The worker still calls `/analyze-shelf`; the AI service decides where YOLO inference runs.
+| Table | Purpose |
+| --- | --- |
+| `users` | Reps, supervisors, admins, roles |
+| `outlets` | Outlet metadata and expected GPS |
+| `outlet_assignments` | Optional rep-to-outlet access scoping |
+| `visits` | Check-in, status, timestamps, notes |
+| `visit_images` | Raw images, storage keys, hashes, metadata |
+| `ai_results` | YOLO output, POSM result, score, summary |
+| `fraud_signals` | Duplicate, blur, GPS, timestamp findings |
+| `visit_reports` | RAG-ready report text, facts, embedding |
+| `event_log` | Audit trail and operational timeline |
 
-## Core Modules
+The worker currently uses a JSON repository for local testing. Production should swap this for a Prisma repository with the same method contract.
 
-### 1. Store Visit Workflow
+## RBAC Strategy
 
-Rep-facing flow:
+RBAC should be simple but real. Do not rely on client-side hiding only; enforce access in server routes.
 
-- Select or create outlet
-- Start visit/check in
-- Capture GPS coordinates
-- Upload shelf images
-- Add outlet notes and optional POSM flags
-- Submit visit
-- Show status: pending analysis, complete, flagged
+MVP roles:
 
-This is the heart of the product. Keep it fast, mobile-first, and impossible to misunderstand.
+| Role | Can do |
+| --- | --- |
+| `REP` | Create own visits, upload images, submit visits, view own visit status |
+| `SUPERVISOR` | View all visits, dashboards, AI results, fraud signals, reports, assistant |
+| `ADMIN` | Supervisor permissions plus user/outlet management and system settings |
 
-### 2. AI Shelf Analysis
+Route enforcement:
 
-The AI service should return structured JSON, not only prose.
+| Area | Access |
+| --- | --- |
+| Visit creation and image upload | `REP`, `SUPERVISOR`, `ADMIN` |
+| Own visit read | Owning `REP`, `SUPERVISOR`, `ADMIN` |
+| Dashboard | `SUPERVISOR`, `ADMIN` |
+| Assistant | `SUPERVISOR`, `ADMIN` |
+| User/outlet admin | `ADMIN` |
+| Worker and FastAPI internals | Service-only, not browser-accessible |
 
-Suggested output shape:
+MVP implementation:
 
-```json
-{
-  "detectedProducts": [
-    {
-      "brand": "Olympic",
-      "category": "biscuit",
-      "confidence": 0.86,
-      "visibility": "low"
-    }
-  ],
-  "competitors": [
-    {
-      "brand": "Pran",
-      "confidence": 0.78
-    }
-  ],
-  "posm": {
-    "detected": false,
-    "notes": "No visible Olympic POSM near the shelf."
-  },
-  "compliance": {
-    "score": 42,
-    "status": "poor",
-    "reasons": [
-      "Low Olympic shelf visibility",
-      "Competitor products dominate the visible shelf",
-      "Missing POSM"
-    ]
-  },
-  "supervisorSummary": "Outlet has poor Olympic visibility and missing POSM. Competitor presence is strong."
-}
-```
+- Store `role` on `users`.
+- Add a shared server helper like `requireRole(["SUPERVISOR", "ADMIN"])`.
+- Scope rep queries by `repId`.
+- Use outlet assignments only if needed for demo realism.
+- Keep UI role-aware, but treat server checks as the source of truth.
 
-MVP approach now that a YOLO model is being trained:
+## AI Analysis Strategy
 
-- Run YOLO first for product and competitor detection.
-- Compute counts, confidence, and approximate share-of-shelf from bounding boxes.
-- Generate annotated overlay images for the supervisor visit detail page.
-- Use a multimodal LLM as a reasoning layer for POSM interpretation, shelf quality, and human-readable summaries.
-- Keep POSM detection in the LLM layer until POSM-specific training data exists.
-- Store raw detector output, normalized compliance fields, overlay image URLs, and raw model output.
+Use the right model for each job:
 
-Fallback approach:
+| Need | Tool |
+| --- | --- |
+| Olympic product detection | YOLO |
+| Competitor product detection | YOLO |
+| Share-of-shelf approximation | YOLO bounding boxes |
+| POSM presence | Vision LLM |
+| Shelf neatness and context | Vision LLM |
+| Compliance score | Deterministic rules |
+| Supervisor summary | LLM summary with rule-based fallback |
+| Historical questions | SQL/Prisma plus vector retrieval |
 
-- If YOLO confidence is low or the model is unavailable, call the vision LLM directly.
-- Mark the result source as `YOLO`, `LLM`, or `HYBRID` so the demo can explain the decision path.
+Important rule: POSM means Olympic-branded POSM only. Other brand signage should be described but should not count as Olympic POSM.
 
-### 3. Compliance Scoring
+## Compliance Strategy
 
-Use a transparent weighted score so it feels business-owned, not magic.
+Compliance should be transparent, not mysterious.
 
-Example score:
+Inputs:
 
-- Brand visibility: 35 points
-- Competitor dominance: 20 points
-- POSM presence: 20 points
-- Shelf cleanliness/arrangement: 15 points
-- Fraud/image quality confidence: 10 points
+- Olympic product count.
+- Competitor product count.
+- Olympic visibility ratio.
+- Competitor dominance.
+- Olympic POSM presence.
+- Fraud signals.
 
-Status bands:
+Outputs:
 
-- 80-100: excellent
-- 60-79: acceptable
-- 40-59: poor
-- 0-39: critical
+- Numeric score.
+- Status: `excellent`, `acceptable`, `poor`, or `critical`.
+- Human-readable reasons.
+- Recommended action.
+- Supervisor summary.
 
-### 4. AI Supervisor Summary
+The dashboard must show reasons, not just the final score.
 
-Generate a one-line summary per visit.
+## Fraud Strategy
 
-Examples:
+Mandatory MVP checks:
 
-- "Outlet has poor Olympic visibility and missing POSM."
-- "Shelf is compliant, but competitor visibility is high on the top rack."
-- "Visit requires review because the image is blurry and GPS is far from outlet location."
+- Duplicate image detection.
+- GPS mismatch.
+- Timestamp anomaly.
+- EXIF GPS/time mismatch.
 
-This summary should appear everywhere: visit list, visit detail, dashboard card, alert message.
+High-value hardening:
 
-### 5. Dashboard
+- Blurry image detection.
+- Perceptual hash for near-duplicates.
+- Fraud severity rollup.
 
-Supervisor-facing dashboard:
+Fraud checks run server-side in the worker after a visit is submitted or synced from offline mode.
 
-- Total visits today
-- Average compliance score
-- Flagged visits
-- Top poor outlets
-- Visit timeline
-- Image history
-- AI results and summaries
-- Fraud signal badges
+## Assistant And RAG Strategy
 
-Recommended screens:
+The assistant should not rely on vector search for exact operational lists.
 
-- `/rep/visits/new`
-- `/rep/visits`
-- `/supervisor`
-- `/supervisor/visits/[id]`
-- `/supervisor/outlets/[id]`
-- `/admin/users`
+Use SQL/Prisma for questions like:
 
-## Fraud Detection
+- "Which outlets are failing compliance?"
+- "Which visits are missing POSM?"
+- "Show critical visits this week."
 
-Implement at least two if possible, because they are high demo value.
+Use vector search for questions like:
 
-### Duplicate Image
+- "Find visits similar to this shelf issue."
+- "Summarize recurring visibility problems."
+- "Where have we seen this kind of competitor dominance?"
 
-- Hash uploaded image bytes with SHA-256.
-- Store `imageHash`.
-- If the hash already exists for another visit, flag as duplicate.
+Each analyzed visit produces a concise `visit_report` with:
 
-### Blurry Image
+- Summary.
+- Structured facts.
+- Retrieval text.
+- Embedding.
 
-- Use OpenCV Laplacian variance.
-- If sharpness is below threshold, flag as blurry.
+## Offline Sync Strategy
 
-### Fake GPS
+Offline sync is a bonus feature, but it fits the field-rep workflow well.
 
-- Store outlet latitude/longitude.
-- Compare check-in GPS to outlet location using Haversine distance.
-- If distance is greater than configured threshold, flag as GPS mismatch.
+MVP behavior:
 
-### Timestamp Anomaly
+- Store visit draft and image blobs in IndexedDB.
+- Use client-generated visit ids.
+- Show pending sync status.
+- When online, upload image first, submit visit second, enqueue analysis third.
+- Use idempotency keys to avoid duplicate visits.
 
-- Compare client timestamp, server timestamp, and EXIF timestamp when available.
-- Flag if difference exceeds threshold.
+Recommended client stack:
 
-MVP recommendation: ship duplicate image, blurry image, and fake GPS. These are straightforward and impressive.
+- Dexie or `idb-keyval`.
+- TanStack Query persistence.
+- Browser online/offline events.
 
-### Fraud Pipeline
+## Observability Strategy
 
-Run fraud checks server-side when a visit is submitted or when an offline visit finishes syncing.
+The async pipeline is a strong observability demo.
+
+Trace shape:
 
 ```text
-Visit submitted
-        |
-        v
-Store image metadata and image hashes
-        |
-        v
-Run fraud checks
-  - duplicate image hash
-  - blurry image score
-  - GPS distance from outlet
-  - timestamp mismatch
-        |
-        v
-Save FraudSignal rows
-        |
-        v
-If high severity signal exists, mark visit FLAGGED
-        |
-        v
-Queue `analyze_visit`; worker calls FastAPI with fraud context
+visit.submit
+  -> db.visit.create
+  -> queue.analyze_visit.enqueue
+  -> worker.analyze_visit
+  -> fraud.check
+  -> ai.analyze_shelf
+  -> yolo.inference
+  -> llm.posm
+  -> db.results.save
 ```
 
-Fraud signals should not block AI analysis. They should enrich the supervisor view and help decide whether the visit needs manual review.
-
-## Bonus Features To Target
-
-Best ROI bonuses for 72 hours:
-
-- Role-based access: rep, supervisor, admin
-- Async queues: BullMQ analysis jobs
-- Offline sync: rep can capture visits and images without network, then sync later
-- AI chat assistant: ask questions over visits and AI results
-- WhatsApp alerts: Twilio or a mock WhatsApp webhook log
-- Observability: LGTM dashboard for queue, worker, inference, and LLM traces
-
-Avoid spending too much time on full multi-user conflict resolution unless the core flow is already stable. For this sprint, offline sync should mean reliable offline visit capture and background upload when connectivity returns.
-
-## LGTM Observability
-
-LGTM is worth integrating because this project has a genuinely observable workflow: upload, queue, fraud checks, YOLO inference, compliance scoring, LLM summary, embedding, and dashboard update.
-
-Recommended 72-hour scope:
-
-- Use OpenTelemetry spans across API routes, BullMQ jobs, FastAPI endpoints, YOLO inference, LLM calls, and database writes.
-- Use Loki for structured logs.
-- Use Tempo for request/job traces.
-- Use Prometheus or Mimir for metrics.
-- Use Grafana for dashboards.
-- Use Grafana Alloy or the OpenTelemetry Collector to receive and forward telemetry.
-
-For local/demo setup, prefer a single Docker Compose observability stack. For hosted deployment, either keep LGTM local for the demo video or send OTLP telemetry to Grafana Cloud.
-
-### Trace Shape
-
-```text
-POST /api/visits/:id/submit
-        |
-        v
-enqueue analyze_visit
-        |
-        v
-worker analyze_visit
-        |
-        +--> fraud.duplicate_hash
-        +--> fraud.blur_score
-        +--> fraud.gps_distance
-        +--> yolo.inference
-        +--> compliance.score
-        +--> llm.supervisor_summary
-        +--> embedding.generate
-        +--> db.save_results
-```
-
-Every span should carry:
-
-- `visit.id`
-- `outlet.id`
-- `job.id`
-- `job.name`
-- `rep.id`
-- `model.name`
-- `model.version`
-- `compliance.score`
-
-### Metrics To Show In Grafana
-
-- Queue depth by job type
-- Job success/failure count
-- Job duration p50/p95
-- YOLO inference latency
-- LLM latency and error rate
-- Average compliance score
-- Flagged visit count
-- Fraud flag count by type
-- Image blur score distribution
-
-### Logs To Emit
-
-Use structured JSON logs from the API, worker, and FastAPI service.
-
-```json
-{
-  "event": "analysis_completed",
-  "visit_id": "visit_123",
-  "outlet_id": "outlet_456",
-  "job_id": "bull_789",
-  "compliance_score": 42,
-  "fraud_flags": ["BLURRY_IMAGE", "GPS_MISMATCH"],
-  "yolo_latency_ms": 830,
-  "llm_latency_ms": 2100,
-  "status": "completed"
-}
-```
-
-### Demo Dashboard Panels
-
-- "AI Pipeline Health"
-- "Queue Depth"
-- "Analysis Latency"
-- "YOLO vs LLM Result Source"
-- "Compliance Score Trend"
-- "Fraud Flags By Type"
-- "Failed Jobs"
-- "Recent Trace Links"
-
-This is intentionally observability-lite. Do not spend the sprint tuning retention, alert routing, or Kubernetes-grade infrastructure. The goal is to demonstrate that the system is traceable and production-shaped.
-
-## Offline Sync
-
-Offline sync is worth implementing because field reps often work in low-connectivity retail environments. Keep the scope sharp:
-
-- Reps can create a visit offline.
-- Reps can attach shelf images offline.
-- The app shows unsynced, syncing, synced, and failed states.
-- When the network returns, queued visits sync to the server.
-- AI analysis starts only after the server receives the visit and image uploads.
-
-### Recommended MVP Approach
-
-Use IndexedDB plus TanStack Query persistence.
-
-```text
-Rep creates visit offline
-        |
-        v
-IndexedDB
-  - pending visit payload
-  - compressed image blobs
-  - local client id
-  - sync status
-        |
-        v
-Connectivity restored
-        |
-        v
-TanStack mutation resumes or custom sync worker flushes queue
-        |
-        v
-Next.js API creates server visit
-        |
-        v
-Image upload completes
-        |
-        v
-BullMQ analyze_visit job starts
-```
-
-Recommended browser storage:
-
-- IndexedDB for visit drafts, image blobs, and pending sync queue
-- TanStack Query persisted cache for server data and paused mutations
-- Service worker/PWA shell for installability and basic offline loading
-
-Useful packages:
-
-- `@tanstack/react-query`
-- `@tanstack/react-query-persist-client`
-- `@tanstack/query-async-storage-persister`
-- `idb-keyval` or Dexie for IndexedDB access
-- `next-pwa` or a minimal custom service worker
-
-### Local Records
-
-Create local-first records with client-generated ids.
-
-```ts
-type OfflineVisitDraft = {
-  localId: string
-  serverId?: string
-  outletId: string
-  repId: string
-  checkInLat?: number
-  checkInLng?: number
-  clientTimestamp: string
-  notes?: string
-  imageLocalIds: string[]
-  status: "draft" | "queued" | "syncing" | "synced" | "failed"
-  retryCount: number
-  lastError?: string
-  createdAt: string
-  updatedAt: string
-}
-
-type OfflineImage = {
-  localId: string
-  visitLocalId: string
-  blob: Blob
-  sha256?: string
-  status: "queued" | "uploading" | "uploaded" | "failed"
-  remoteUrl?: string
-}
-```
-
-### Sync Rules
-
-- Use UUID/CUID client ids so visits can be created offline without waiting for a server id.
-- Make `POST /api/visits` idempotent by accepting `clientVisitId`.
-- Store `clientVisitId` on the server with a unique constraint.
-- Retry failed sync with backoff.
-- Never run AI analysis from the browser; enqueue analysis after server-side sync succeeds.
-- Preserve client timestamp and compare it with server timestamp for fraud detection.
-
-### UI Requirements
-
-Rep screens should include:
-
-- Offline banner
-- "Saved locally" confirmation
-- Pending sync count
-- Per-visit sync badges
-- Retry button for failed sync
-
-Supervisor screens should include:
-
-- "Synced late" badge if client timestamp and server timestamp differ significantly
-- Timestamp anomaly fraud flag if the delay looks suspicious
-
-### What Not To Build In 72 Hours
-
-Avoid full database-level bidirectional sync unless it becomes the main technical story. TanStack DB with PowerSync/RxDB/Electric-style sync is a strong future upgrade, but it adds backend and conflict-resolution complexity. For this sprint, a local outbox pattern is faster, easier to demo, and safer.
-
-## Data Model
-
-```prisma
-model User {
-  id        String   @id @default(cuid())
-  name      String
-  email     String   @unique
-  role      Role
-  visits    Visit[]
-  createdAt DateTime @default(now())
-}
-
-enum Role {
-  REP
-  SUPERVISOR
-  ADMIN
-}
-
-model Outlet {
-  id        String   @id @default(cuid())
-  name      String
-  code      String   @unique
-  address   String?
-  latitude  Float?
-  longitude Float?
-  visits    Visit[]
-  createdAt DateTime @default(now())
-}
-
-model Visit {
-  id              String       @id @default(cuid())
-  outletId        String
-  repId           String
-  status          VisitStatus  @default(PENDING)
-  checkInLat      Float?
-  checkInLng      Float?
-  clientTimestamp DateTime?
-  notes           String?
-  outlet          Outlet       @relation(fields: [outletId], references: [id])
-  rep             User         @relation(fields: [repId], references: [id])
-  images          VisitImage[]
-  aiResult        AIResult?
-  report          VisitReport?
-  fraudSignals    FraudSignal[]
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-}
-
-enum VisitStatus {
-  PENDING
-  ANALYZING
-  COMPLETE
-  FLAGGED
-  FAILED
-}
-
-model VisitImage {
-  id        String   @id @default(cuid())
-  visitId   String
-  url       String
-  imageHash String?
-  metadata  Json?
-  visit     Visit    @relation(fields: [visitId], references: [id])
-  createdAt DateTime @default(now())
-}
-
-model AIResult {
-  id                String   @id @default(cuid())
-  visitId           String   @unique
-  analysisSource    String
-  detectorModel     String?
-  detectorVersion   String?
-  complianceScore   Int
-  status            String
-  supervisorSummary String
-  yoloDetections    Json?
-  detectedProducts  Json
-  competitors       Json
-  posm              Json
-  overlayImageUrl   String?
-  rawModelOutput    Json
-  visit             Visit    @relation(fields: [visitId], references: [id])
-  createdAt         DateTime @default(now())
-}
-
-model VisitReport {
-  id            String   @id @default(cuid())
-  visitId       String   @unique
-  outletId      String
-  title         String
-  summary       String
-  retrievalText String
-  facts         Json
-  embedding     Unsupported("vector")?
-  visit         Visit    @relation(fields: [visitId], references: [id])
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-}
-
-model FraudSignal {
-  id        String   @id @default(cuid())
-  visitId   String
-  type      String
-  severity  String
-  message   String
-  metadata  Json?
-  visit     Visit    @relation(fields: [visitId], references: [id])
-  createdAt DateTime @default(now())
-}
-
-model EventLog {
-  id        String   @id @default(cuid())
-  visitId   String?
-  jobId     String?
-  event     String
-  level     String
-  traceId   String?
-  spanId    String?
-  metadata  Json?
-  createdAt DateTime @default(now())
-}
-```
-
-## AI Summary, Report Storage, And RAG
-
-The system should store two things after every visit analysis:
-
-- Structured facts for dashboards, filters, and accurate lists
-- Natural-language report text plus embedding for semantic retrieval
-
-Do not rely on RAG alone for questions like "which outlets are failing compliance?" That should be answered with deterministic database filters first, then the LLM can explain the result.
-
-### Summary Generation Pipeline
-
-```text
-analyze_visit job
-        |
-        v
-Worker calls FastAPI `/analyze-shelf`
-        |
-        v
-FastAPI returns YOLO, LLM POSM, compliance, and summary JSON
-        |
-        v
-Worker merges fraud signals and persists normalized results
-        |
-        v
-Save AIResult
-        |
-        v
-Build VisitReport.retrievalText
-        |
-        v
-Generate embedding for retrievalText
-        |
-        v
-Save VisitReport with embedding
-```
-
-The `AIResult` table powers the dashboard. The `VisitReport` table powers supervisor search/chat.
-
-### Report Text Format
-
-Each visit should produce a compact, factual report document.
-
-```text
-Outlet: Rahim Store
-Outlet Code: OUT-1024
-Visit Date: 2026-05-21
-Rep: Ayesha Rahman
-Compliance Score: 42
-Compliance Status: poor
-Primary Issue: Low Olympic visibility and missing POSM.
-Detected Olympic Products: Olympic Energy Plus, Olympic Toast
-Competitors Present: Pran, Danish
-POSM: missing
-Fraud Signals: GPS mismatch, blurry image
-Supervisor Summary: Outlet has poor Olympic visibility and missing POSM. Competitor presence is strong.
-Recommended Action: Supervisor should request a revisit with POSM placement and clearer shelf photo.
-```
-
-This text is what gets embedded. Keep it concise, fact-heavy, and consistent across visits.
-
-### Chat/RAG Query Flow
-
-```text
-Supervisor asks:
-"Which outlets are failing compliance?"
-        |
-        v
-Classify intent
-  - metric/list question
-  - semantic explanation question
-        |
-        v
-For metric/list questions:
-  call approved backend data tool
-  backend runs parameterized SQL/Prisma query
-        |
-        v
-For semantic questions:
-  vector search VisitReport.embedding
-  optional filters by date, outlet, rep, region, score
-        |
-        v
-LLM answers using retrieved rows only
-        |
-        v
-Return outlet list with score, date, reason, and visit link
-```
-
-The chatbot does not execute arbitrary SQL generated by the LLM. Instead, the chat endpoint exposes a small set of read-only tools:
-
-```ts
-type ChatDataTool =
-  | {
-      name: "getFailingOutlets"
-      args: {
-        from?: string
-        to?: string
-        threshold?: number
-        region?: string
-      }
-    }
-  | {
-      name: "getFlaggedVisits"
-      args: {
-        from?: string
-        to?: string
-        fraudType?: string
-      }
-    }
-  | {
-      name: "searchVisitReports"
-      args: {
-        query: string
-        from?: string
-        to?: string
-        limit?: number
-      }
-    }
-  | {
-      name: "getOutletHistory"
-      args: {
-        outletId: string
-      }
-    }
-```
-
-For example, if the supervisor asks "Which outlets are failing compliance today?", the LLM should produce a tool call like:
-
-```json
-{
-  "name": "getFailingOutlets",
-  "args": {
-    "from": "2026-05-21T00:00:00+06:00",
-    "to": "2026-05-21T23:59:59+06:00",
-    "threshold": 60
-  }
-}
-```
-
-Then the backend runs a safe query:
-
-```ts
-const rows = await prisma.aIResult.findMany({
-  where: {
-    complianceScore: { lt: threshold },
-    visit: {
-      createdAt: { gte: from, lte: to },
-    },
-  },
-  include: {
-    visit: {
-      include: {
-        outlet: true,
-        fraudSignals: true,
-      },
-    },
-  },
-  orderBy: { complianceScore: "asc" },
-})
-```
-
-The final LLM step only formats and explains these returned rows. It should not invent outlets or change counts.
-
-Example response:
-
-```text
-The following outlets are failing compliance today:
-
-1. Rahim Store - score 42 - poor Olympic visibility, missing POSM
-2. Maa Enterprise - score 38 - competitor dominance, blurry image
-3. City Mart Dhanmondi - score 55 - acceptable shelf share but no POSM
-```
-
-### Retrieval Strategy
-
-Use hybrid retrieval:
-
-- SQL for exact questions: failing outlets, average score, visits today, flagged visits
-- Vector search for fuzzy questions: "stores with weak brand visibility", "places similar to Rahim Store", "why are reps struggling in Mirpur?"
-- LLM for final explanation, ranking, and supervisor-friendly wording
-
-Recommended storage:
-
-- PostgreSQL with `pgvector` for embeddings
-- Supabase Vector or Neon Postgres with pgvector if deployment speed matters
-- Prisma for normal tables, raw SQL migration for vector index if needed
-
-Recommended indexes:
-
-- `AIResult.complianceScore`
-- `Visit.createdAt`
-- `Visit.outletId`
-- `FraudSignal.type`
-- `VisitReport.embedding` vector index
-
-### Guardrails
-
-- The assistant must cite visit ids or outlet names from retrieved database rows.
-- For counts and lists, trust SQL results over LLM guesses.
-- Store prompt version and model name in `rawModelOutput` or report metadata.
-- If no rows match, say no matching visits were found instead of inventing outlets.
-- Keep generated summaries short enough to scan in the dashboard.
+Minimum signals:
+
+- `visitId`, `jobId`, and `traceId` in logs.
+- Queue depth.
+- Worker job duration and failure count.
+- YOLO inference latency.
+- LLM latency and failure count.
+- Compliance score distribution.
 
 ## API Boundaries
 
 ### Next.js API
 
-- `POST /api/visits`: create visit
-- `POST /api/visits/:id/images`: upload image metadata
-- `POST /api/visits/:id/submit`: enqueue analysis
-- `GET /api/visits`: list visits
-- `GET /api/visits/:id`: visit detail
-- `GET /api/dashboard`: supervisor metrics
-- `GET /api/ops/metrics`: queue, model, and workflow metrics for ops dashboard
-- `GET /api/ops/events`: recent event log entries with trace ids
-- `POST /api/reports/search`: hybrid SQL/vector report search
-- `POST /api/chat`: AI assistant over visit reports and dashboard data
+```text
+POST /api/visits
+POST /api/visits/:id/images
+POST /api/visits/:id/submit
+GET  /api/visits/:id
+GET  /api/dashboard
+POST /api/assistant/query
+```
 
-### Worker Jobs
+### Worker Queues
 
-- `analyze_visit`: load visit/images, run contextual fraud checks, call FastAPI `/analyze-shelf`, save AI result, emit trace spans
-- `embed_visit_report`: build and embed the visit report for RAG
-- `send_alert`: send WhatsApp alert for critical or flagged visits
+```text
+analyze_visit
+embed_visit_report
+send_alert
+```
 
-### FastAPI Endpoints
+### FastAPI AI Service
 
-- `POST /analyze-shelf`: image URLs plus visit/outlet context
-- `POST /detect-yolo`: run trained YOLO model and return detections/overlay
-- `POST /fraud/image-quality`: optional separate image quality check
-- `GET /metrics`: Prometheus-compatible service metrics
-- `GET /health`: deployment health check
+```text
+GET  /health
+GET  /ready
+GET  /model
+POST /detect-yolo
+POST /detect-yolo/upload
+POST /analyze-shelf
+```
 
-## AI Prompting Strategy
+## Deployment Shape
 
-Use structured output and make the model act like a retail execution auditor.
+```text
+Vercel
+  - Next.js app
 
-Prompt responsibilities:
+Managed Postgres
+  - app data
+  - pgvector reports
 
-- Identify primary brand visibility.
-- Identify competitor presence.
-- Estimate shelf share.
-- Detect POSM/signage.
-- Detect image quality issues.
-- Produce compliance reasons.
-- Produce one supervisor summary.
+Managed Redis
+  - BullMQ queues
 
-Hybrid analysis rule:
+Worker host
+  - analyze_visit worker
+  - embedding worker
 
-- YOLO is the source of truth for trained product/competitor counts.
-- The vision LLM is the source of judgment for POSM, signage, shelf neatness, and supervisor wording.
-- Compliance scoring combines both, but must clearly store which signals came from YOLO versus LLM.
+FastAPI host
+  - AI service
+  - local fallback inference
 
-Store the prompt version with results. This is an easy way to show AI-native engineering maturity.
+Modal
+  - GPU YOLO endpoint
 
-## Demo Script
+Grafana/LGTM
+  - logs, traces, metrics
+```
 
-1. Login as rep.
-2. Create visit for an outlet.
-3. Upload shelf image.
-4. Submit visit.
-5. Queue changes status to analyzing.
-6. Dashboard updates with compliance score.
-7. AI summary appears.
-8. Fraud badge appears if GPS/image issue is detected.
-9. Login as supervisor.
-10. Open flagged visit and trigger WhatsApp alert or view alert log.
-11. Ask AI assistant: "Which outlets had poor Olympic visibility today?"
+## Demo Path
 
-## 72-Hour Build Plan
+The final demo should show:
 
-### First 12 Hours
+1. Rep creates a visit.
+2. Rep checks in with GPS.
+3. Rep uploads shelf image.
+4. Visit moves to `ANALYZING`.
+5. Worker runs async AI analysis.
+6. Dashboard shows compliance score and reasons.
+7. Supervisor opens image overlay and POSM finding.
+8. Fraud signal appears if applicable.
+9. Assistant answers "Which outlets are failing compliance?"
+10. Observability view shows the async trace or structured logs.
 
-- Scaffold Next.js app
-- Add Prisma/Postgres schema
-- Add auth and roles
-- Build outlet and visit forms
-- Upload images to storage
-- Seed demo users and outlets
+## Build Priorities
 
-### 12-24 Hours
+Must ship:
 
-- Add BullMQ queue
-- Add FastAPI analysis service
-- Implement duplicate image, blurry image, and fake GPS checks
-- Save AI results
-- Add visit status transitions
+- Store visit workflow.
+- Image upload.
+- YOLO analysis.
+- Compliance scoring.
+- Supervisor summary.
+- At least one fraud signal.
+- Dashboard.
 
-### 24-42 Hours
+High-impact bonuses:
 
-- Build supervisor dashboard
-- Build visit detail page with image history
-- Add compliance score UI
-- Add fraud badges
-- Add AI summary cards
+- Modal GPU inference.
+- Offline sync.
+- Assistant with exact SQL-backed answers.
+- LGTM observability.
+- Alert log or WhatsApp alert.
 
-### 42-60 Hours
+Can cut if time is tight:
 
-- Add AI chat assistant
-- Add WhatsApp alert or alert log
-- Improve mobile rep flow
-- Add seed data and demo images
-- Add error handling and loading states
+- Advanced RBAC beyond `REP`, `SUPERVISOR`, and `ADMIN`.
+- Complex offline conflict resolution.
+- True WhatsApp delivery.
+- Perceptual hash.
+- Advanced dashboard filters.
 
-### 60-72 Hours
+## Key Decisions
 
-- Polish demo
-- Deploy
-- Add README and architecture diagram
-- Record short demo video
-- Prepare tradeoff notes and future roadmap
-
-## Decision Guidance
-
-If time gets tight, protect these first:
-
-- Rep check-in and image upload
-- AI analysis with structured result
-- Supervisor summary
-- Dashboard
-- One fraud signal
-
-Everything else is bonus. The winning demo is a complete loop, not a pile of half-wired features.
+- Heavy AI work belongs in workers, not request handlers.
+- FastAPI is the AI service boundary; Next.js owns product APIs.
+- YOLO handles trained detections; LLM handles POSM/context.
+- Exact assistant questions use SQL/Prisma before vector search.
+- Every flagged visit must expose reasons and recommended action.
+- Local fallback is required for demo resilience.

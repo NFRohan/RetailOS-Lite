@@ -31,6 +31,8 @@ export const config = {
   defaultLlmEnabled: env("WORKER_USE_LLM", "true").toLowerCase() !== "false",
   fraudGpsThresholdMeters: envNumber("FRAUD_GPS_THRESHOLD_METERS", 200),
   fraudTimestampDelayHours: envNumber("FRAUD_TIMESTAMP_DELAY_HOURS", 6),
+  fraudExifGpsThresholdMeters: envNumber("FRAUD_EXIF_GPS_THRESHOLD_METERS", 300),
+  fraudExifTimestampDriftHours: envNumber("FRAUD_EXIF_TIMESTAMP_DRIFT_HOURS", 24),
 };
 
 export function validateWorkerConfig(): void {

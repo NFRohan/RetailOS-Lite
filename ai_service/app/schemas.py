@@ -65,6 +65,7 @@ class YoloResponse(BaseModel):
     image_width: int = Field(..., alias="imageWidth")
     image_height: int = Field(..., alias="imageHeight")
     confidence_threshold: float = Field(..., alias="confidenceThreshold")
+    input_image_size: int | None = Field(default=None, alias="inputImageSize")
     inference_ms: float = Field(..., alias="inferenceMs")
     counts: DetectionCounts
     areas: DetectionAreas
