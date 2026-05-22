@@ -1,10 +1,11 @@
-import crypto from "node:crypto";
-
 export const CORRELATION_HEADER = "x-correlation-id";
 export const REQUEST_ID_HEADER = "x-request-id";
 
 export function createCorrelationId(prefix = "corr"): string {
-  return `${prefix}_${crypto.randomUUID?.() ?? crypto.randomBytes(12).toString("hex")}`;
+  const id =
+    globalThis.crypto?.randomUUID?.() ??
+    `${Date.now()}_${Math.random().toString(36).slice(2)}_${Math.random().toString(36).slice(2)}`;
+  return `${prefix}_${id}`;
 }
 
 export function correlationIdFromHeaders(headers: Headers, fallbackPrefix = "corr"): string {
