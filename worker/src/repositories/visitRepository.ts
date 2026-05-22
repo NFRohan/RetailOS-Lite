@@ -17,5 +17,6 @@ export type VisitRepository = {
   saveFraudSignals(signals: FraudSignal[]): Promise<void>;
   saveAIResult(result: AIResultRecord): Promise<void>;
   saveVisitReport(report: VisitReportRecord): Promise<void>;
+  getVisitReport(visitId: string): Promise<VisitReportRecord>;
   addEvent(event: EventLogRecord): Promise<void>;
 };

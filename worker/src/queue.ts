@@ -17,6 +17,10 @@ type AnalyzeVisitDeadLetterJobData = {
   payload: AnalyzeVisitJobData;
 };
 
+type EmbedVisitReportJobData = {
+  visitId: string;
+};
+
 async function createRepository() {
   if (config.usePrisma && process.env.DATABASE_URL) {
     const { PrismaClient } = await import("@prisma/client");
@@ -37,6 +41,7 @@ export function createAnalyzeVisitQueue(connection = createRedisConnection()) {
 
 export type WorkerRuntime = {
   worker: Worker<AnalyzeVisitJobData>;
+  embedWorker: Worker<EmbedVisitReportJobData>;
   events: QueueEvents;
   close: () => Promise<void>;
 };
@@ -86,7 +91,42 @@ export function createAnalyzeVisitWorker(connection = createRedisConnection()) {
     void addToDeadLetterQueue(deadLetterQueue, job, error);
   });
 
-  return { worker, embedQueue, deadLetterQueue };
+  const embedWorker = new Worker<EmbedVisitReportJobData>(
+    config.embedVisitReportQueueName,
+    async (job) => {
+      const repository = await createRepository();
+      const report = await repository.getVisitReport(job.data.visitId);
+      await aiService.indexVisitReport(report);
+      await repository.addEvent({
+        visitId: job.data.visitId,
+        jobId: job.id,
+        event: "VISIT_REPORT_INDEXED",
+        level: "info",
+        metadata: {
+          queue: job.queueName,
+          vectorId: `visit-report:${job.data.visitId}`,
+        },
+        createdAt: new Date().toISOString(),
+      });
+    },
+    {
+      connection,
+      concurrency: Math.max(1, Math.min(config.workerConcurrency, 4)),
+    },
+  );
+
+  embedWorker.on("failed", (job, error) => {
+    console.error(
+      JSON.stringify({
+        event: "visit_report_index_failed",
+        visitId: job?.data.visitId,
+        jobId: job?.id,
+        error: error.message,
+      }),
+    );
+  });
+
+  return { worker, embedWorker, embedQueue, deadLetterQueue };
 }
 
 export function createAnalyzeVisitQueueEvents(connection = createRedisConnection()) {
@@ -97,14 +137,15 @@ export function createAnalyzeVisitRuntime(): WorkerRuntime {
   validateWorkerConfig();
   const workerConnection = createRedisConnection();
   const eventsConnection = createRedisConnection();
-  const { worker, embedQueue, deadLetterQueue } = createAnalyzeVisitWorker(workerConnection);
+  const { worker, embedWorker, embedQueue, deadLetterQueue } = createAnalyzeVisitWorker(workerConnection);
   const events = createAnalyzeVisitQueueEvents(eventsConnection);
 
   return {
     worker,
+    embedWorker,
     events,
     close: async () => {
-      await Promise.all([worker.close(), events.close(), embedQueue.close(), deadLetterQueue.close()]);
+      await Promise.all([worker.close(), embedWorker.close(), events.close(), embedQueue.close(), deadLetterQueue.close()]);
       await Promise.all([workerConnection.quit(), eventsConnection.quit()]);
     },
   };

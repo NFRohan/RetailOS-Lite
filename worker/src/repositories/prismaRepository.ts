@@ -183,6 +183,22 @@ export class PrismaVisitRepository implements VisitRepository {
     });
   }
 
+  async getVisitReport(visitId: string): Promise<VisitReportRecord> {
+    const report = await this.prisma.visitReport.findUnique({
+      where: { visitId },
+    });
+    if (!report) throw new Error(`Visit report not found: ${visitId}`);
+    return {
+      visitId: report.visitId,
+      outletId: report.outletId,
+      title: report.title,
+      summary: report.summary,
+      retrievalText: report.retrievalText,
+      facts: report.facts as Record<string, unknown>,
+      createdAt: report.createdAt.toISOString(),
+    };
+  }
+
   async addEvent(event: EventLogRecord): Promise<void> {
     await this.prisma.eventLog.create({
       data: {

@@ -109,6 +109,13 @@ export class JsonVisitRepository implements VisitRepository {
     });
   }
 
+  async getVisitReport(visitId: string): Promise<VisitReportRecord> {
+    const db = await this.read();
+    const report = db.visitReports.find((candidate) => candidate.visitId === visitId);
+    if (!report) throw new Error(`Visit report not found: ${visitId}`);
+    return report;
+  }
+
   async addEvent(event: EventLogRecord): Promise<void> {
     await this.mutate((db) => {
       db.eventLog.push(event);

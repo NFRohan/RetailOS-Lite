@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { AnalyzeShelfRequest, AnalyzeShelfResponse } from "../types/ai.js";
+import type { VisitReportRecord } from "../types/domain.js";
 
 const analyzeShelfResponseSchema = z.object({
   visitId: z.string().nullable().optional(),
@@ -31,6 +32,13 @@ const analyzeShelfResponseSchema = z.object({
   supervisorSummary: z.string(),
 });
 
+const indexVisitReportResponseSchema = z.object({
+  status: z.string(),
+  vectorId: z.string(),
+  namespace: z.string(),
+  embeddingModel: z.string(),
+});
+
 export class AIServiceClient {
   constructor(
     private readonly baseUrl: string,
@@ -52,6 +60,22 @@ export class AIServiceClient {
     const json = await response.json();
     analyzeShelfResponseSchema.parse(json);
     return json as AnalyzeShelfResponse;
+  }
+
+  async indexVisitReport(report: VisitReportRecord): Promise<void> {
+    const response = await fetch(`${this.baseUrl.replace(/\/$/, "")}/rag/index-report`, {
+      method: "POST",
+      headers: this.headers(),
+      body: JSON.stringify(report),
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`AI report indexing failed (${response.status}): ${body}`);
+    }
+
+    const json = await response.json();
+    indexVisitReportResponseSchema.parse(json);
   }
 
   private headers(): Record<string, string> {
