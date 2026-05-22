@@ -1,29 +1,84 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { PhotoUploader, type PhotoFile } from "@/components/photo-uploader";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { Camera, Check, ChevronLeft, Loader2, MapPin, ShieldCheck, X } from "lucide-react";
+import { Camera, Check, ChevronLeft, Loader2, MapPin, Search, ShieldCheck, Store, X } from "lucide-react";
 
 const STEPS = ["Outlet", "Photos", "Review"];
+
+type OutletSearchCandidate = {
+  id: string;
+  name: string;
+  code: string;
+  address: string | null;
+  distanceMeters: number;
+  confidence: number;
+  visitCount: number;
+};
+
+type OutletSearchResponse = {
+  candidates: OutletSearchCandidate[];
+  autoMatch: OutletSearchCandidate | null;
+  radiusMeters: number;
+};
 
 export default function NewVisitPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [shopName, setShopName] = useState("");
+  const [selectedOutletId, setSelectedOutletId] = useState("");
+  const [forceNewOutlet, setForceNewOutlet] = useState(false);
   const [notes, setNotes] = useState("");
   const [gps, setGps] = useState<{ lat: number; lng: number } | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [photos, setPhotos] = useState<PhotoFile[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+
+  const normalizedShopName = shopName.trim();
+  const canSearchOutlets = Boolean(normalizedShopName.length >= 2 && gps);
+  const { data: outletSearch, isFetching: searchingOutlets } = useQuery<OutletSearchResponse>({
+    queryKey: ["outlet-search", normalizedShopName, gps?.lat.toFixed(5), gps?.lng.toFixed(5)],
+    enabled: canSearchOutlets,
+    queryFn: async () => {
+      const response = await fetch("/api/outlets/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: normalizedShopName,
+          lat: gps?.lat,
+          lng: gps?.lng,
+        }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.error ?? "Could not search nearby outlets.");
+      }
+      return response.json();
+    },
+  });
+
+  useEffect(() => {
+    setSelectedOutletId("");
+    setForceNewOutlet(false);
+  }, [normalizedShopName, gps?.lat, gps?.lng]);
+
+  useEffect(() => {
+    if (outletSearch?.autoMatch) {
+      setSelectedOutletId(outletSearch.autoMatch.id);
+      setForceNewOutlet(false);
+    }
+  }, [outletSearch?.autoMatch]);
 
   function captureGps() {
     setError("");
@@ -54,6 +109,8 @@ export default function NewVisitPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           outletName: shopName.trim(),
+          outletId: selectedOutletId || undefined,
+          forceNewOutlet: forceNewOutlet || !selectedOutletId,
           checkInLat: gps?.lat,
           checkInLng: gps?.lng,
           clientTimestamp: new Date().toISOString(),
@@ -81,8 +138,12 @@ export default function NewVisitPage() {
     }
   }
 
-  const normalizedShopName = shopName.trim();
-  const canContinueFromOutlet = Boolean(normalizedShopName.length >= 2 && gps);
+  const suggestions = outletSearch?.candidates ?? [];
+  const selectedCandidate = suggestions.find((candidate) => candidate.id === selectedOutletId) ?? null;
+  const canCreateImplicitly = Boolean(outletSearch && suggestions.length === 0 && !searchingOutlets);
+  const canContinueFromOutlet = Boolean(
+    normalizedShopName.length >= 2 && gps && (selectedOutletId || forceNewOutlet || canCreateImplicitly),
+  );
 
   return (
     <div className="space-y-5">
@@ -123,7 +184,7 @@ export default function NewVisitPage() {
                 onChange={(event) => setShopName(event.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                New shops are saved automatically and marked unverified until a supervisor reviews them.
+                Search is scoped to your current GPS, so suggestions stay near the outlet you are visiting.
               </p>
             </div>
 
@@ -169,6 +230,26 @@ export default function NewVisitPage() {
                 </div>
               </div>
             </div>
+
+            <OutletMatchPanel
+              autoMatch={outletSearch?.autoMatch ?? null}
+              forceNewOutlet={forceNewOutlet}
+              gpsCaptured={Boolean(gps)}
+              isLoading={searchingOutlets}
+              onCreateNew={() => {
+                setSelectedOutletId("");
+                setForceNewOutlet(true);
+              }}
+              onSelect={(candidateId) => {
+                setSelectedOutletId(candidateId);
+                setForceNewOutlet(false);
+              }}
+              radiusMeters={outletSearch?.radiusMeters ?? 100}
+              searchReady={canSearchOutlets}
+              selectedOutletId={selectedOutletId}
+              shopName={normalizedShopName}
+              suggestions={suggestions}
+            />
 
             <div className="space-y-2">
               <Label className="text-navy">Visit Notes</Label>
@@ -232,6 +313,14 @@ export default function NewVisitPage() {
             <div className="rounded-2xl border border-[#d6ddea] bg-[#f9f9ff] p-4">
               <dl className="space-y-3 text-sm">
                 <ReviewRow label="Shop" value={normalizedShopName || "-"} />
+                <ReviewRow
+                  label="Outlet Match"
+                  value={
+                    selectedCandidate
+                      ? `${selectedCandidate.name} (${Math.round(selectedCandidate.confidence * 100)}%)`
+                      : "New shop pending supervisor review"
+                  }
+                />
                 <ReviewRow label="GPS" value={gps ? `${gps.lat.toFixed(5)}, ${gps.lng.toFixed(5)}` : "Not captured"} />
                 <ReviewRow label="Photos" value={`${photos.length} image${photos.length === 1 ? "" : "s"}`} />
                 <ReviewRow label="Notes" value={notes || "No notes added"} />
@@ -266,6 +355,126 @@ export default function NewVisitPage() {
             </div>
           </CardContent>
         </Card>
+      )}
+    </div>
+  );
+}
+
+function OutletMatchPanel({
+  autoMatch,
+  forceNewOutlet,
+  gpsCaptured,
+  isLoading,
+  onCreateNew,
+  onSelect,
+  radiusMeters,
+  searchReady,
+  selectedOutletId,
+  shopName,
+  suggestions,
+}: {
+  autoMatch: OutletSearchCandidate | null;
+  forceNewOutlet: boolean;
+  gpsCaptured: boolean;
+  isLoading: boolean;
+  onCreateNew: () => void;
+  onSelect: (candidateId: string) => void;
+  radiusMeters: number;
+  searchReady: boolean;
+  selectedOutletId: string;
+  shopName: string;
+  suggestions: OutletSearchCandidate[];
+}) {
+  if (!gpsCaptured) {
+    return (
+      <div className="rounded-2xl border border-dashed border-[#d6ddea] bg-[#f9f9ff] p-4 text-sm text-muted-foreground">
+        Capture GPS to search the nearby outlet registry.
+      </div>
+    );
+  }
+
+  if (shopName.length < 2) {
+    return (
+      <div className="rounded-2xl border border-dashed border-[#d6ddea] bg-[#f9f9ff] p-4 text-sm text-muted-foreground">
+        Enter at least 2 characters to search nearby shops.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3 rounded-2xl border border-[#d6ddea] bg-[#f9f9ff] p-4">
+      <div className="flex items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#eef2fb] text-teal">
+          {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-3">
+            <p className="font-semibold text-navy">Nearby Outlet Match</p>
+            <Badge variant={autoMatch ? "success" : "outline"} className="bg-white">
+              {autoMatch ? "Auto-match ready" : `${radiusMeters}m GPS scope`}
+            </Badge>
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            We only show candidates near your current GPS. If the shop is unknown, submit it as a new pending outlet.
+          </p>
+        </div>
+      </div>
+
+      {isLoading && <p className="text-sm text-muted-foreground">Searching nearby master data...</p>}
+
+      {!isLoading && searchReady && suggestions.length === 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          No nearby match found. This visit can continue as a new pending outlet for supervisor review.
+        </div>
+      )}
+
+      {!isLoading && suggestions.length > 0 && (
+        <div className="space-y-2">
+          {suggestions.map((candidate) => {
+            const selected = selectedOutletId === candidate.id;
+            return (
+              <button
+                key={candidate.id}
+                type="button"
+                className={cn(
+                  "w-full rounded-xl border bg-white p-3 text-left transition-colors",
+                  selected ? "border-teal ring-2 ring-teal/15" : "border-[#d6ddea] hover:border-teal/60",
+                )}
+                onClick={() => onSelect(candidate.id)}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Store className="h-4 w-4 text-teal" />
+                      <p className="font-semibold text-navy">{candidate.name}</p>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {candidate.code} • {candidate.distanceMeters}m away • {candidate.visitCount} visit
+                      {candidate.visitCount === 1 ? "" : "s"}
+                    </p>
+                    {candidate.address && <p className="mt-1 text-xs text-muted-foreground">{candidate.address}</p>}
+                  </div>
+                  <Badge variant={candidate.confidence >= 0.9 ? "success" : "warning"}>
+                    {Math.round(candidate.confidence * 100)}%
+                  </Badge>
+                </div>
+              </button>
+            );
+          })}
+
+          <button
+            type="button"
+            className={cn(
+              "w-full rounded-xl border border-dashed p-3 text-left text-sm transition-colors",
+              forceNewOutlet
+                ? "border-amber-400 bg-amber-50 text-amber-900"
+                : "border-[#c1c7cc] bg-white text-muted-foreground hover:border-amber-400 hover:bg-amber-50",
+            )}
+            onClick={onCreateNew}
+          >
+            This is not the right shop. Submit <span className="font-semibold">{shopName}</span> as a new pending outlet.
+          </button>
+        </div>
       )}
     </div>
   );
