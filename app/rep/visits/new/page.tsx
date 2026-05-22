@@ -3,11 +3,10 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
-import { OutletCombobox } from "@/components/outlet-combobox";
 import { PhotoUploader, type PhotoFile } from "@/components/photo-uploader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -15,28 +14,16 @@ import { Camera, Check, ChevronLeft, Loader2, MapPin, ShieldCheck, X } from "luc
 
 const STEPS = ["Outlet", "Photos", "Review"];
 
-type OutletOption = {
-  id: string;
-  name: string;
-  code: string;
-  address?: string | null;
-};
-
 export default function NewVisitPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
-  const [outletId, setOutletId] = useState("");
+  const [shopName, setShopName] = useState("");
   const [notes, setNotes] = useState("");
   const [gps, setGps] = useState<{ lat: number; lng: number } | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [photos, setPhotos] = useState<PhotoFile[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-
-  const { data: outlets = [] } = useQuery<OutletOption[]>({
-    queryKey: ["outlets"],
-    queryFn: () => fetch("/api/outlets").then((r) => r.json()),
-  });
 
   function captureGps() {
     setError("");
@@ -66,7 +53,7 @@ export default function NewVisitPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          outletId,
+          outletName: shopName.trim(),
           checkInLat: gps?.lat,
           checkInLng: gps?.lng,
           clientTimestamp: new Date().toISOString(),
@@ -94,8 +81,8 @@ export default function NewVisitPage() {
     }
   }
 
-  const selectedOutlet = outlets.find((o) => o.id === outletId);
-  const canContinueFromOutlet = Boolean(outletId && gps);
+  const normalizedShopName = shopName.trim();
+  const canContinueFromOutlet = Boolean(normalizedShopName.length >= 2 && gps);
 
   return (
     <div className="space-y-5">
@@ -121,13 +108,23 @@ export default function NewVisitPage() {
         <Card className="border-[#d6ddea] bg-white shadow-[0_12px_32px_rgba(2,43,58,0.08)]">
           <CardHeader className="pb-4">
             <CardTitle className="text-lg text-navy">Outlet Check-In</CardTitle>
-            <p className="text-sm text-muted-foreground">Verify the store before uploading shelf images.</p>
+            <p className="text-sm text-muted-foreground">Capture the shop name and GPS before uploading shelf images.</p>
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="space-y-2">
-              <Label className="text-navy">Outlet</Label>
-              <OutletCombobox outlets={outlets} value={outletId} onChange={setOutletId} />
-              {selectedOutlet?.address && <p className="text-xs text-muted-foreground">{selectedOutlet.address}</p>}
+              <Label className="text-navy" htmlFor="shopName">
+                Shop Name
+              </Label>
+              <Input
+                id="shopName"
+                className="h-12 rounded-2xl bg-[#f9f9ff]"
+                placeholder="e.g. Maa Enterprise, Bhai Bhai Store"
+                value={shopName}
+                onChange={(event) => setShopName(event.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                New shops are saved automatically and marked unverified until a supervisor reviews them.
+              </p>
             </div>
 
             <div
@@ -234,7 +231,7 @@ export default function NewVisitPage() {
           <CardContent className="space-y-5">
             <div className="rounded-2xl border border-[#d6ddea] bg-[#f9f9ff] p-4">
               <dl className="space-y-3 text-sm">
-                <ReviewRow label="Outlet" value={selectedOutlet ? `${selectedOutlet.name} (${selectedOutlet.code})` : "-"} />
+                <ReviewRow label="Shop" value={normalizedShopName || "-"} />
                 <ReviewRow label="GPS" value={gps ? `${gps.lat.toFixed(5)}, ${gps.lng.toFixed(5)}` : "Not captured"} />
                 <ReviewRow label="Photos" value={`${photos.length} image${photos.length === 1 ? "" : "s"}`} />
                 <ReviewRow label="Notes" value={notes || "No notes added"} />
