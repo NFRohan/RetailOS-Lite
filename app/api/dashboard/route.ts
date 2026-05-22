@@ -12,6 +12,7 @@ type DailyAggregateRow = {
   posmPresent: number | bigint;
   posmMissing: number | bigint;
   fraudDetections: number | bigint;
+  safeVisits: number | bigint;
 };
 
 type NormalizedDailyAggregate = {
@@ -22,6 +23,7 @@ type NormalizedDailyAggregate = {
   posmPresent: number;
   posmMissing: number;
   fraudDetections: number;
+  safeVisits: number;
   posmCompliancePct: number;
   qualityScore: number;
 };
@@ -128,7 +130,16 @@ async function dailyAggregates(
         round(avg(ar."complianceScore"))::int AS "avgComplianceScore",
         count(*) FILTER (WHERE ar."complianceScore" IS NOT NULL)::int AS "scoredVisits",
         count(*) FILTER (WHERE ar."posm"->>'detected' = 'true')::int AS "posmPresent",
-        count(*) FILTER (WHERE ar."posm"->>'detected' = 'false')::int AS "posmMissing"
+        count(*) FILTER (WHERE ar."posm"->>'detected' = 'false')::int AS "posmMissing",
+        count(*) FILTER (
+          WHERE NOT EXISTS (
+            SELECT 1 FROM "FraudSignal" hf
+            WHERE hf."visitId" = v.id
+          )
+          AND v.status <> 'FLAGGED'
+          AND (ar."complianceScore" IS NULL OR ar."complianceScore" >= 70)
+          AND COALESCE(ar."posm"->>'detected', 'true') <> 'false'
+        )::int AS "safeVisits"
       FROM "Visit" v
       LEFT JOIN "AIResult" ar ON ar."visitId" = v.id
       WHERE ((v."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${timeZone})::date >= ${startDate}::date
@@ -152,7 +163,8 @@ async function dailyAggregates(
       COALESCE(vd."scoredVisits", 0)::int AS "scoredVisits",
       COALESCE(vd."posmPresent", 0)::int AS "posmPresent",
       COALESCE(vd."posmMissing", 0)::int AS "posmMissing",
-      COALESCE(fd."fraudDetections", 0)::int AS "fraudDetections"
+      COALESCE(fd."fraudDetections", 0)::int AS "fraudDetections",
+      COALESCE(vd."safeVisits", 0)::int AS "safeVisits"
     FROM days d
     LEFT JOIN visit_daily vd ON vd.day = d.day
     LEFT JOIN fraud_daily fd ON fd.day = d.day
@@ -162,6 +174,7 @@ async function dailyAggregates(
   return rows.map((row) => {
     const visits = toNumber(row.visits);
     const fraudDetections = toNumber(row.fraudDetections);
+    const safeVisits = toNumber(row.safeVisits);
     const posmPresent = toNumber(row.posmPresent);
     const posmMissing = toNumber(row.posmMissing);
     const knownPosm = posmPresent + posmMissing;
@@ -174,8 +187,9 @@ async function dailyAggregates(
       posmPresent,
       posmMissing,
       fraudDetections,
+      safeVisits,
       posmCompliancePct: knownPosm > 0 ? Math.round((posmPresent / knownPosm) * 100) : 0,
-      qualityScore: visits > 0 ? Math.max(0, Math.round(((visits - fraudDetections) / visits) * 100)) : 0,
+      qualityScore: visits > 0 ? Math.max(0, Math.round((safeVisits / visits) * 100)) : 0,
     };
   });
 }
@@ -188,6 +202,7 @@ function summarizeTrend(points: NormalizedDailyAggregate[]) {
   const posmMissing = sum(points, "posmMissing");
   const knownPosm = posmPresent + posmMissing;
   const fraudDetections = sum(points, "fraudDetections");
+  const safeVisits = sum(points, "safeVisits");
 
   return {
     visits,
@@ -195,7 +210,7 @@ function summarizeTrend(points: NormalizedDailyAggregate[]) {
     posmMissing,
     fraudDetections,
     posmCompliancePct: knownPosm > 0 ? Math.round((posmPresent / knownPosm) * 100) : 0,
-    qualityScore: visits > 0 ? Math.max(0, Math.round(((visits - fraudDetections) / visits) * 100)) : 0,
+    qualityScore: visits > 0 ? Math.max(0, Math.round((safeVisits / visits) * 100)) : 0,
   };
 }
 

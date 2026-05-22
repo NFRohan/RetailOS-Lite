@@ -47,7 +47,6 @@ export default function SupervisorDashboardPage() {
           icon={MapPin}
           label="Total Visits Today"
           value={summary?.visitsToday ?? data?.visitsToday ?? 0}
-          helper={summary?.timeZone ? `Business day in ${summary.timeZone}` : "Local business day"}
         />
         <MetricCard
           delay={0.04}
@@ -110,12 +109,12 @@ type MetricCardProps = {
 function MetricCard({ delay, icon: Icon, label, value, delta, helper, intent = "default" }: MetricCardProps) {
   const critical = intent === "critical";
   return (
-    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay }}>
+    <motion.div className="h-full" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay }}>
       <Card
         className={
           critical
-            ? "relative overflow-hidden border-rose-200 bg-white shadow-[0_1px_3px_rgba(2,43,58,0.05)]"
-            : "border-[#d6ddea] bg-white shadow-[0_1px_3px_rgba(2,43,58,0.05)]"
+            ? "relative h-full min-h-[124px] overflow-hidden border-rose-200 bg-white shadow-[0_1px_3px_rgba(2,43,58,0.05)]"
+            : "h-full min-h-[124px] border-[#d6ddea] bg-white shadow-[0_1px_3px_rgba(2,43,58,0.05)]"
         }
       >
         {critical && <div className="absolute left-0 top-0 h-full w-1 bg-rose-500" />}
@@ -151,7 +150,7 @@ function PosmComplianceCard({ percentage, delta }: { percentage: number; delta: 
   const offset = circumference - (Math.max(0, Math.min(100, percentage)) / 100) * circumference;
 
   return (
-    <Card className="border-[#d6ddea] bg-white shadow-[0_1px_3px_rgba(2,43,58,0.05)]">
+    <Card className="h-full min-h-[124px] border-[#d6ddea] bg-white shadow-[0_1px_3px_rgba(2,43,58,0.05)]">
       <CardContent className="flex items-center justify-between p-6">
         <div>
           <div className="mb-4 flex items-center gap-2 text-muted-foreground">
@@ -195,18 +194,18 @@ function PerformanceTrendCard({
   const maxScore = Math.max(100, ...trend.map((point) => point.qualityScore));
 
   return (
-    <Card className="border-[#d6ddea] bg-white shadow-[0_1px_3px_rgba(2,43,58,0.05)]">
+    <Card className="h-full min-h-[124px] border-[#d6ddea] bg-white shadow-[0_1px_3px_rgba(2,43,58,0.05)]">
       <CardHeader className="flex flex-row items-start justify-between pb-2">
         <div className="flex items-center gap-2 text-muted-foreground">
           <TrendingUp className="h-5 w-5" />
           <CardTitle className="text-xs font-semibold uppercase tracking-wide">Visit Quality</CardTitle>
         </div>
-        <span className="text-xs font-semibold text-muted-foreground">Clean visits / total visits</span>
+        <span className="text-xs font-semibold text-muted-foreground">Safe visits / total visits</span>
       </CardHeader>
       <CardContent>
         <div className="flex items-end gap-6">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">No-fraud rate</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Safe visit rate</p>
             <p className="text-4xl font-bold text-navy">{score}%</p>
           </div>
           <div className="flex h-14 flex-1 items-end gap-1">
