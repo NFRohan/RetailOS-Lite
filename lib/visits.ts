@@ -13,6 +13,7 @@ type VisitWithRelations = Prisma.VisitGetPayload<{
 
 export function serializeVisitDetail(visit: VisitWithRelations): VisitDetail {
   const outcome = visit.aiResult?.outcomeSummary as OutcomeSummary | null;
+  const actionableFraudSignals = visit.fraudSignals.filter(isActionableFraudSignal);
   return {
     id: visit.id,
     status: visit.status,
@@ -46,7 +47,7 @@ export function serializeVisitDetail(visit: VisitWithRelations): VisitDetail {
           yoloDetections: visit.aiResult.yoloDetections,
         }
       : null,
-    fraudSignals: visit.fraudSignals.map((f) => ({
+    fraudSignals: actionableFraudSignals.map((f) => ({
       id: f.id,
       type: f.type,
       severity: f.severity,
@@ -57,20 +58,21 @@ export function serializeVisitDetail(visit: VisitWithRelations): VisitDetail {
 
 export function serializeVisitListItem(visit: VisitWithRelations): VisitListItem {
   const outcome = visit.aiResult?.outcomeSummary as OutcomeSummary | null;
-  const highFraud = visit.fraudSignals.some((f) => f.severity === "HIGH");
+  const actionableFraudSignals = visit.fraudSignals.filter(isActionableFraudSignal);
+  const highFraud = actionableFraudSignals.some((f) => f.severity === "HIGH");
   const complianceScore = visit.aiResult?.complianceScore ?? null;
   const hasMissingPosm = posmDetected(visit.aiResult?.posm) === false || outcome?.posm.detected === false;
   const reviewReasons = reviewReasonsForVisit({
     visitStatus: visit.status,
     complianceScore,
-    fraudSignals: visit.fraudSignals,
+    fraudSignals: actionableFraudSignals,
     hasMissingPosm,
     outcome,
   });
   const riskStatus = riskStatusForVisit({
     visitStatus: visit.status,
     complianceScore,
-    fraudCount: visit.fraudSignals.length,
+    fraudCount: actionableFraudSignals.length,
     highFraud,
     hasMissingPosm,
   });
@@ -86,7 +88,7 @@ export function serializeVisitListItem(visit: VisitWithRelations): VisitListItem
     complianceScore,
     complianceStatus: visit.aiResult?.status ?? outcome?.complianceStatus ?? null,
     supervisorSummary: visit.aiResult?.supervisorSummary ?? outcome?.supervisorSummary ?? null,
-    fraudCount: visit.fraudSignals.length,
+    fraudCount: actionableFraudSignals.length,
     hasHighFraud: highFraud,
     hasMissingPosm,
     reviewReasons,
@@ -98,6 +100,10 @@ function posmDetected(posm: unknown): boolean | null {
   if (!posm || typeof posm !== "object") return null;
   const detected = (posm as { detected?: unknown }).detected;
   return typeof detected === "boolean" ? detected : null;
+}
+
+function isActionableFraudSignal(signal: { type: string }): boolean {
+  return signal.type !== "IMAGE_HASHED";
 }
 
 function reviewReasonsForVisit({

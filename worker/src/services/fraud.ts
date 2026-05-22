@@ -3,12 +3,16 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import exifr from "exifr";
+import sharp from "sharp";
 import { config } from "../config.js";
 import type { FraudSignal, Visit, VisitImage } from "../types/domain.js";
 import type { VisitRepository } from "../repositories/visitRepository.js";
 
 const nowIso = () => new Date().toISOString();
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+const PERCEPTUAL_HASH_ALGORITHM = "dhash-8x8";
+const PERCEPTUAL_HASH_DUPLICATE_THRESHOLD = 8;
+const PERCEPTUAL_HASH_HIGH_SEVERITY_THRESHOLD = 4;
 
 type ExifMetadata = {
   latitude?: number;
@@ -24,6 +28,7 @@ export async function runContextualFraudChecks(
   const signals: FraudSignal[] = [];
 
   signals.push(...(await hashAndDuplicateSignals(visit, repository)));
+  signals.push(...(await perceptualDuplicateSignals(visit, repository)));
   signals.push(...(await exifSignals(visit, repository)));
   const gpsSignal = gpsMismatchSignal(visit);
   if (gpsSignal) signals.push(gpsSignal);
@@ -48,14 +53,6 @@ async function hashAndDuplicateSignals(
       const updatedImage: VisitImage = { ...image, imageHash };
       await repository.updateVisitImage(updatedImage);
       image.imageHash = imageHash;
-      signals.push({
-        visitId: visit.id,
-        type: "IMAGE_HASHED",
-        severity: "LOW",
-        message: "Image SHA-256 hash computed for duplicate detection.",
-        metadata: { imageId: image.id, imageHash },
-        createdAt: nowIso(),
-      });
     }
 
     if (image.imageHash) {
@@ -75,6 +72,69 @@ async function hashAndDuplicateSignals(
         });
       }
     }
+  }
+
+  return signals;
+}
+
+async function perceptualDuplicateSignals(
+  visit: Visit,
+  repository: VisitRepository,
+): Promise<FraudSignal[]> {
+  const signals: FraudSignal[] = [];
+  const candidates = await repository.findImagesWithPerceptualHash(visit.id);
+
+  for (const image of visit.images) {
+    let currentHash = perceptualHashFromMetadata(image.metadata);
+
+    if (!currentHash) {
+      const imageBuffer = await imageBufferFor(image);
+      if (!imageBuffer) continue;
+
+      currentHash = await perceptualHash(imageBuffer);
+      if (!currentHash) continue;
+
+      const updatedImage: VisitImage = {
+        ...image,
+        metadata: withPerceptualHash(image.metadata, currentHash),
+      };
+      await repository.updateVisitImage(updatedImage);
+      image.metadata = updatedImage.metadata;
+    }
+
+    const matches = candidates
+      .filter((candidate) => !image.imageHash || candidate.imageHash !== image.imageHash)
+      .map((candidate) => {
+        const candidateHash = perceptualHashFromMetadata(candidate.metadata);
+        if (!candidateHash) return null;
+        return {
+          imageId: candidate.id,
+          visitId: candidate.visitId,
+          distance: hammingDistanceHex(currentHash, candidateHash),
+        };
+      })
+      .filter((match): match is { imageId: string; visitId: string; distance: number } =>
+        match !== null && match.distance <= PERCEPTUAL_HASH_DUPLICATE_THRESHOLD,
+      )
+      .sort((a, b) => a.distance - b.distance);
+
+    if (matches.length === 0) continue;
+
+    const nearestDistance = matches[0]?.distance ?? PERCEPTUAL_HASH_DUPLICATE_THRESHOLD;
+    signals.push({
+      visitId: visit.id,
+      type: "PERCEPTUAL_DUPLICATE_IMAGE",
+      severity: nearestDistance <= PERCEPTUAL_HASH_HIGH_SEVERITY_THRESHOLD ? "HIGH" : "MEDIUM",
+      message: "Image is visually similar to a previous visit image.",
+      metadata: {
+        imageId: image.id,
+        perceptualHash: currentHash,
+        algorithm: PERCEPTUAL_HASH_ALGORITHM,
+        threshold: PERCEPTUAL_HASH_DUPLICATE_THRESHOLD,
+        similarImages: matches.slice(0, 5),
+      },
+      createdAt: nowIso(),
+    });
   }
 
   return signals;
@@ -141,6 +201,88 @@ async function downloadImageBuffer(url: string): Promise<Buffer | null> {
 
 function sha256(buffer: Buffer): string {
   return crypto.createHash("sha256").update(buffer).digest("hex");
+}
+
+async function perceptualHash(buffer: Buffer): Promise<string | null> {
+  try {
+    const raw = await sharp(buffer)
+      .rotate()
+      .resize(9, 8, { fit: "fill" })
+      .grayscale()
+      .raw()
+      .toBuffer();
+
+    let bits = "";
+    for (let row = 0; row < 8; row += 1) {
+      for (let column = 0; column < 8; column += 1) {
+        const left = raw[row * 9 + column];
+        const right = raw[row * 9 + column + 1];
+        bits += left > right ? "1" : "0";
+      }
+    }
+
+    return bitsToHex(bits);
+  } catch {
+    return null;
+  }
+}
+
+function withPerceptualHash(
+  metadata: Record<string, unknown> | undefined,
+  perceptualHashValue: string,
+): Record<string, unknown> {
+  const baseMetadata = isRecord(metadata) ? metadata : {};
+  const fraudMetadata = isRecord(baseMetadata.fraud) ? baseMetadata.fraud : {};
+
+  return {
+    ...baseMetadata,
+    fraud: {
+      ...fraudMetadata,
+      perceptualHash: perceptualHashValue,
+      perceptualHashAlgorithm: PERCEPTUAL_HASH_ALGORITHM,
+    },
+  };
+}
+
+function perceptualHashFromMetadata(metadata: Record<string, unknown> | undefined): string | null {
+  if (!isRecord(metadata) || !isRecord(metadata.fraud)) return null;
+  const value = metadata.fraud.perceptualHash;
+  if (typeof value !== "string" || !/^[a-f0-9]{16}$/i.test(value)) return null;
+  return value.toLowerCase();
+}
+
+function bitsToHex(bits: string): string {
+  let hex = "";
+  for (let index = 0; index < bits.length; index += 4) {
+    hex += Number.parseInt(bits.slice(index, index + 4), 2).toString(16);
+  }
+  return hex.padStart(16, "0");
+}
+
+function hammingDistanceHex(left: string, right: string): number {
+  if (left.length !== right.length) return Number.POSITIVE_INFINITY;
+
+  let distance = 0;
+  for (let index = 0; index < left.length; index += 1) {
+    const leftNibble = Number.parseInt(left[index] ?? "0", 16);
+    const rightNibble = Number.parseInt(right[index] ?? "0", 16);
+    distance += bitCount(leftNibble ^ rightNibble);
+  }
+  return distance;
+}
+
+function bitCount(value: number): number {
+  let count = 0;
+  let remaining = value;
+  while (remaining > 0) {
+    count += remaining & 1;
+    remaining >>= 1;
+  }
+  return count;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 async function readExifMetadata(imageBuffer: Buffer): Promise<ExifMetadata | null> {

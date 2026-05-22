@@ -8,6 +8,7 @@ BullMQ worker for async visit analysis.
 analyze_visit job
   -> load visit/images
   -> contextual fraud checks
+  -> compute SHA-256 + perceptual hashes for duplicate detection
   -> EXIF GPS/time checks when image metadata exists
   -> call FastAPI /analyze-shelf
   -> save AIResult
@@ -51,8 +52,8 @@ Compliance reasons:
 - Competitor products dominate visible shelf space.
 - POSM was not detected in the shelf image.
 Fraud signals:
-- LOW IMAGE_HASHED: Image SHA-256 hash computed for duplicate detection.
 - MEDIUM EXIF_GPS_MISMATCH: Image EXIF GPS location does not match the submitted visit location.
+- MEDIUM PERCEPTUAL_DUPLICATE_IMAGE: Image is visually similar to a previous visit image.
 ```
 
 ## Run With BullMQ

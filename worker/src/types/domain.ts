@@ -9,6 +9,7 @@ export type FraudSignal = {
     | "GPS_MISMATCH"
     | "TIMESTAMP_ANOMALY"
     | "IMAGE_HASHED"
+    | "PERCEPTUAL_DUPLICATE_IMAGE"
     | "EXIF_GPS_MISMATCH"
     | "EXIF_TIMESTAMP_ANOMALY";
   severity: FraudSeverity;

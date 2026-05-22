@@ -333,8 +333,8 @@ Fraud detection is mandatory and helps demo credibility.
 
 Deliverables:
 
-- Blur detection using Laplacian variance.
-- Perceptual hash for near-duplicate images.
+- Perceptual hash for near-duplicate images. `DONE`
+- Blur detection using Laplacian variance. `SKIPPED` for demo reliability because shaky captures and low-end phone cameras would create avoidable false positives.
 - Existing exact SHA-256 duplicate check remains.
 - Existing EXIF GPS/time checks remain.
 - GPS mismatch and timestamp anomaly persisted to database.
@@ -342,7 +342,6 @@ Deliverables:
 
 Definition of Done:
 
-- Blurry image creates `BLURRY_IMAGE` signal.
 - Reused exact image creates `DUPLICATE_IMAGE` signal.
 - EXIF GPS/time mismatch creates `EXIF_GPS_MISMATCH` or `EXIF_TIMESTAMP_ANOMALY`.
 - Nearby but not exact duplicate can be detected if perceptual hash lands.
@@ -351,9 +350,8 @@ Definition of Done:
 
 Tests:
 
-- Fixture image below blur threshold flags.
-- Sharp fixture image does not flag.
 - Same image on two visits flags duplicate.
+- Visually similar image on two visits creates `PERCEPTUAL_DUPLICATE_IMAGE`.
 - Far check-in coordinates flag GPS mismatch.
 - Future client timestamp flags anomaly.
 - EXIF GPS/time fixture flags image metadata mismatch.

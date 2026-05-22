@@ -410,12 +410,18 @@ Current signals:
 
 | Signal | Severity | Logic |
 | --- | --- | --- |
-| `IMAGE_HASHED` | `LOW` | Computes SHA-256 for local or URL-backed image if missing |
 | `DUPLICATE_IMAGE` | `HIGH` | Same SHA-256 hash exists on another visit |
+| `PERCEPTUAL_DUPLICATE_IMAGE` | `MEDIUM` or `HIGH` | dHash perceptual hash is visually close to a previous visit image |
 | `GPS_MISMATCH` | `MEDIUM` or `HIGH` | Check-in location exceeds outlet threshold |
 | `TIMESTAMP_ANOMALY` | `MEDIUM` or `HIGH` | Client timestamp is future-dated or synced too late |
 | `EXIF_GPS_MISMATCH` | `MEDIUM` or `HIGH` | Embedded image GPS is far from check-in or outlet location |
 | `EXIF_TIMESTAMP_ANOMALY` | `MEDIUM` or `HIGH` | Embedded image capture time is far from submitted visit timestamp |
+
+Implementation notes:
+
+- SHA-256 and perceptual hashes are stored on `VisitImage`; hash creation itself is not counted as fraud.
+- Perceptual duplicate detection uses `dhash-8x8` and flags Hamming distance `<= 8`.
+- Distance `<= 4` is treated as `HIGH`; distance `5-8` is treated as `MEDIUM`.
 
 Default thresholds:
 
@@ -428,8 +434,7 @@ FRAUD_EXIF_TIMESTAMP_DRIFT_HOURS=24
 
 Not yet implemented:
 
-- Blur score using OpenCV/Laplacian variance.
-- Perceptual hash for near-duplicates.
+- Blur score using OpenCV/Laplacian variance. This is intentionally skipped for the demo because low-end phones and small hand movement can create false positives without a more careful quality pipeline.
 - Fraud severity rollup.
 
 ## Worker Contract

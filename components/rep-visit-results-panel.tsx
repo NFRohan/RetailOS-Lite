@@ -44,13 +44,14 @@ export function RepVisitResultsPanel({ visit, outcome }: Props) {
       : totalProducts > 0
         ? Math.round((displayCounts.olympic / totalProducts) * 100)
         : 0;
-  const fraudSignals =
+  const fraudSignals = (
     outcome?.fraudSignals ??
     visit.fraudSignals.map((signal) => ({
       type: signal.type,
       severity: signal.severity,
       message: signal.message,
-    }));
+    }))
+  ).filter((signal) => signal.type !== "IMAGE_HASHED");
   const isFraudFlagged = fraudSignals.length > 0;
 
   return (

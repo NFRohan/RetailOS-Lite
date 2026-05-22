@@ -13,9 +13,9 @@ export type VisitRepository = {
   updateVisitStatus(visitId: string, status: VisitStatus): Promise<void>;
   updateVisitImage(image: VisitImage): Promise<void>;
   findImagesByHash(imageHash: string, excludeVisitId: string): Promise<VisitImage[]>;
+  findImagesWithPerceptualHash(excludeVisitId: string): Promise<VisitImage[]>;
   saveFraudSignals(signals: FraudSignal[]): Promise<void>;
   saveAIResult(result: AIResultRecord): Promise<void>;
   saveVisitReport(report: VisitReportRecord): Promise<void>;
   addEvent(event: EventLogRecord): Promise<void>;
 };
-

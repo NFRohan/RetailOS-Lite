@@ -135,6 +135,7 @@ async function dailyAggregates(
           WHERE NOT EXISTS (
             SELECT 1 FROM "FraudSignal" hf
             WHERE hf."visitId" = v.id
+              AND hf."type" <> 'IMAGE_HASHED'
           )
           AND v.status <> 'FLAGGED'
           AND (ar."complianceScore" IS NULL OR ar."complianceScore" >= 70)
@@ -154,6 +155,7 @@ async function dailyAggregates(
       JOIN "FraudSignal" f ON f."visitId" = v.id
       WHERE ((v."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${timeZone})::date >= ${startDate}::date
         AND ((v."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${timeZone})::date < ${endExclusiveDate}::date
+        AND f."type" <> 'IMAGE_HASHED'
       GROUP BY day
     )
     SELECT

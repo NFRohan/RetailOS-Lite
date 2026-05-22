@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import type {
   AIResultRecord,
   EventLogRecord,
@@ -77,6 +77,25 @@ export class PrismaVisitRepository implements VisitRepository {
       localPath: img.localPath ?? undefined,
       imageHash: img.imageHash ?? undefined,
     }));
+  }
+
+  async findImagesWithPerceptualHash(excludeVisitId: string): Promise<VisitImage[]> {
+    const images = await this.prisma.visitImage.findMany({
+      where: {
+        visitId: { not: excludeVisitId },
+        metadata: { not: Prisma.JsonNull },
+      },
+    });
+    return images
+      .map((img) => ({
+        id: img.id,
+        visitId: img.visitId,
+        url: img.url,
+        localPath: img.localPath ?? undefined,
+        imageHash: img.imageHash ?? undefined,
+        metadata: img.metadata as Record<string, unknown> | undefined,
+      }))
+      .filter((image) => typeof perceptualHashFromMetadata(image.metadata) === "string");
   }
 
   async saveFraudSignals(signals: FraudSignal[]): Promise<void> {
@@ -183,4 +202,11 @@ function jsonValue(value: unknown): Prisma.InputJsonValue {
 
 function jsonOrUndefined(value: unknown): Prisma.InputJsonValue | undefined {
   return value === undefined || value === null ? undefined : jsonValue(value);
+}
+
+function perceptualHashFromMetadata(metadata: Record<string, unknown> | undefined): string | null {
+  const fraud = metadata?.fraud;
+  if (!fraud || typeof fraud !== "object") return null;
+  const value = (fraud as { perceptualHash?: unknown }).perceptualHash;
+  return typeof value === "string" ? value : null;
 }

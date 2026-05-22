@@ -44,9 +44,10 @@ export function VisitResultsPanel({ visit, outcome }: Props) {
       : totalProducts > 0
         ? Math.round((displayCounts.olympic / totalProducts) * 100)
         : 0;
-  const fraudSignals =
+  const fraudSignals = (
     outcome?.fraudSignals ??
-    visit.fraudSignals.map((s) => ({ type: s.type, severity: s.severity, message: s.message }));
+    visit.fraudSignals.map((s) => ({ type: s.type, severity: s.severity, message: s.message }))
+  ).filter((signal) => signal.type !== "IMAGE_HASHED");
 
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">

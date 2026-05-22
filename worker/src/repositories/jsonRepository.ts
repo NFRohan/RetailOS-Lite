@@ -69,6 +69,15 @@ export class JsonVisitRepository implements VisitRepository {
     );
   }
 
+  async findImagesWithPerceptualHash(excludeVisitId: string): Promise<VisitImage[]> {
+    const db = await this.read();
+    return db.visits.flatMap((visit) =>
+      visit.id === excludeVisitId
+        ? []
+        : visit.images.filter((image) => typeof perceptualHashFromMetadata(image.metadata) === "string"),
+    );
+  }
+
   async saveFraudSignals(signals: FraudSignal[]): Promise<void> {
     await this.mutate((db) => {
       for (const signal of signals) {
@@ -123,3 +132,9 @@ export class JsonVisitRepository implements VisitRepository {
   }
 }
 
+function perceptualHashFromMetadata(metadata: Record<string, unknown> | undefined): string | null {
+  const fraud = metadata?.fraud;
+  if (!fraud || typeof fraud !== "object") return null;
+  const value = (fraud as { perceptualHash?: unknown }).perceptualHash;
+  return typeof value === "string" ? value : null;
+}
