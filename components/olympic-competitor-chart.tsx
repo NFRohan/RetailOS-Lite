@@ -1,34 +1,33 @@
-"use client";
-
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from "recharts";
-
 type Props = {
   olympic: number;
   competitor: number;
 };
 
 export function OlympicCompetitorChart({ olympic, competitor }: Props) {
-  const data = [
-    { name: "Olympic", count: olympic, fill: "#E8A317" },
-    { name: "Competitor", count: competitor, fill: "#E07A5F" },
+  const maxCount = Math.max(olympic, competitor, 1);
+  const rows = [
+    { name: "Olympic", count: olympic, fill: "bg-[#E8A317]" },
+    { name: "Competitor", count: competitor, fill: "bg-[#E07A5F]" },
   ];
 
   return (
-    <div className="h-32 w-full">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} layout="vertical" margin={{ left: 8, right: 8 }}>
-          <XAxis type="number" hide />
-          <YAxis type="category" dataKey="name" width={80} tick={{ fill: "currentColor", fontSize: 12 }} />
-          <Bar dataKey="count" radius={[0, 4, 4, 0]} barSize={24}>
-            {data.map((entry, i) => (
-              <Cell key={i} fill={entry.fill} />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-      <div className="mt-2 flex justify-between text-xs text-muted-foreground">
+    <div className="w-full space-y-3">
+      <div className="space-y-3">
+        {rows.map((row) => (
+          <div key={row.name} className="grid grid-cols-[76px_minmax(0,1fr)] items-center gap-2">
+            <span className="text-right text-xs font-medium text-navy">{row.name}</span>
+            <div className="h-6 rounded-r-md bg-[#eef2fb]">
+              <div
+                className={`h-full min-w-1 rounded-r-md ${row.fill}`}
+                style={{ width: `${Math.max(4, (row.count / maxCount) * 100)}%` }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-3 pl-[84px] text-xs text-muted-foreground">
         <span>Olympic: {olympic}</span>
-        <span>Competitor: {competitor}</span>
+        <span className="text-right">Competitor: {competitor}</span>
       </div>
     </div>
   );
