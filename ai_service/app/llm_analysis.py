@@ -58,10 +58,10 @@ def build_prompt(
     rep_notes: str | None = None,
 ) -> str:
     return f"""
-You are a retail execution auditor for Olympic shelf visibility.
+You are a retail execution auditor for Olympic brand's Foodie Noodles product shelf visibility.
 
 Analyze the shelf image for:
-- Olympic POSM presence only: Olympic branded posters, wobblers, shelf strips, danglers, signage, stickers, or promotional material.
+- Olympic/Foodie POSM presence only: Olympic/Foodie branded posters, wobblers, shelf strips, danglers, signage, stickers, or promotional material.
 - Shelf quality: neatness, visibility, whether the products are easy to see.
 - Competitor pressure: whether competitor products visually dominate.
 - Supervisor action: short, operational, and practical.
@@ -74,11 +74,11 @@ Use these YOLO detections as grounding facts:
 - Rep notes: {rep_notes or "none"}
 
 Important POSM rule:
-- posm.detected means Olympic-branded POSM is clearly visible.
+- posm.detected means Olympic/Foodie-branded POSM is clearly visible.
 - Ignore unrelated POSM from other brands such as Nescafe, Pran, Mr. Noodles, or generic store signage.
-- If non-Olympic promotional material is visible, describe it in otherPromotionalMaterial but keep posm.detected false unless Olympic branding is visible.
+- If non-Olympic/Foodie promotional material is visible, describe it in otherPromotionalMaterial but keep posm.detected false unless Olympic/Foodie branding is visible.
 
-Do not invent exact product counts beyond the YOLO facts. If Olympic POSM is not clearly visible, mark posm.detected false.
+Do not invent exact product counts beyond the YOLO facts. If Olympic/Foodie POSM is not clearly visible, mark posm.detected false.
 Keep supervisorSummary under 25 words.
 """.strip()
 
