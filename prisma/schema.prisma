@@ -21,6 +21,12 @@ enum VisitStatus {
   FAILED
 }
 
+enum OutletVerificationStatus {
+  VERIFIED
+  UNVERIFIED
+  REJECTED
+}
+
 model User {
   id           String   @id @default(cuid())
   name         String
@@ -32,14 +38,21 @@ model User {
 }
 
 model Outlet {
-  id        String   @id @default(cuid())
-  name      String
-  code      String   @unique
-  address   String?
-  latitude  Float?
-  longitude Float?
-  visits    Visit[]
-  createdAt DateTime @default(now())
+  id                 String                   @id @default(cuid())
+  name               String
+  normalizedName     String?
+  code               String                   @unique
+  address            String?
+  latitude           Float?
+  longitude          Float?
+  verificationStatus OutletVerificationStatus @default(VERIFIED)
+  verifiedAt         DateTime?
+  createdByVisitId   String?
+  visits             Visit[]
+  createdAt          DateTime                 @default(now())
+
+  @@index([normalizedName])
+  @@index([verificationStatus, createdAt])
 }
 
 model Visit {

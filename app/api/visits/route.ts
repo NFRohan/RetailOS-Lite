@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
+import { numberOrNull, OutletResolutionError, resolveOutletForVisit } from "@/lib/outlets";
 import { prisma } from "@/lib/prisma";
 import { serializeVisitDetail, serializeVisitListItem } from "@/lib/visits";
 import { NextResponse } from "next/server";
@@ -69,27 +70,63 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const visit = await prisma.visit.create({
-    data: {
-      clientVisitId: body.clientVisitId,
+  try {
+    const checkInLat = numberOrNull(body.checkInLat);
+    const checkInLng = numberOrNull(body.checkInLng);
+    const outletResolution = await resolveOutletForVisit({
       outletId: body.outletId,
-      repId: session.user.id,
-      checkInLat: body.checkInLat,
-      checkInLng: body.checkInLng,
-      clientTimestamp: body.clientTimestamp ? new Date(body.clientTimestamp) : new Date(),
-      notes: body.notes,
-      status: "PENDING",
-    },
-    include: {
-      outlet: true,
-      rep: { select: { id: true, name: true, email: true } },
-      images: true,
-      aiResult: true,
-      fraudSignals: true,
-    },
-  });
+      outletName: body.outletName,
+      checkInLat,
+      checkInLng,
+    });
 
-  return NextResponse.json(serializeVisitDetail(visit), { status: 201 });
+    const visit = await prisma.visit.create({
+      data: {
+        clientVisitId: body.clientVisitId,
+        outletId: outletResolution.outlet.id,
+        repId: session.user.id,
+        checkInLat,
+        checkInLng,
+        clientTimestamp: body.clientTimestamp ? new Date(body.clientTimestamp) : new Date(),
+        notes: body.notes,
+        status: "PENDING",
+      },
+      include: {
+        outlet: true,
+        rep: { select: { id: true, name: true, email: true } },
+        images: true,
+        aiResult: true,
+        fraudSignals: true,
+      },
+    });
+
+    if (outletResolution.created) {
+      await prisma.outlet.update({
+        where: { id: outletResolution.outlet.id },
+        data: { createdByVisitId: visit.id },
+      });
+
+      await prisma.eventLog.create({
+        data: {
+          visitId: visit.id,
+          event: "OUTLET_AUTO_CREATED",
+          level: "info",
+          metadata: {
+            outletId: outletResolution.outlet.id,
+            outletName: outletResolution.outlet.name,
+            matchedBy: outletResolution.matchedBy,
+          },
+        },
+      });
+    }
+
+    return NextResponse.json(serializeVisitDetail(visit), { status: 201 });
+  } catch (error) {
+    if (error instanceof OutletResolutionError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    throw error;
+  }
 }
 
 function wantsPaginatedVisitLogs(searchParams: URLSearchParams): boolean {

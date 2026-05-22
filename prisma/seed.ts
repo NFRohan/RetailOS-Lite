@@ -6,6 +6,7 @@ const prisma = new PrismaClient();
 
 async function main() {
   const passwordHash = await bcrypt.hash("demo123", 10);
+  const verifiedAt = new Date();
 
   const rep = await prisma.user.upsert({
     where: { email: "rep@demo.com" },
@@ -32,35 +33,56 @@ async function main() {
   const outlets = await Promise.all([
     prisma.outlet.upsert({
       where: { code: "OUT-1024" },
-      update: {},
+      update: {
+        normalizedName: normalizeOutletName("Rahim Store"),
+        verificationStatus: "VERIFIED",
+        verifiedAt,
+      },
       create: {
         name: "Rahim Store",
+        normalizedName: normalizeOutletName("Rahim Store"),
         code: "OUT-1024",
         address: "Dhanmondi, Dhaka",
         latitude: 23.7809,
         longitude: 90.2791,
+        verificationStatus: "VERIFIED",
+        verifiedAt,
       },
     }),
     prisma.outlet.upsert({
       where: { code: "OUT-2048" },
-      update: {},
+      update: {
+        normalizedName: normalizeOutletName("Maa Enterprise"),
+        verificationStatus: "VERIFIED",
+        verifiedAt,
+      },
       create: {
         name: "Maa Enterprise",
+        normalizedName: normalizeOutletName("Maa Enterprise"),
         code: "OUT-2048",
         address: "Mirpur, Dhaka",
         latitude: 23.8223,
         longitude: 90.3654,
+        verificationStatus: "VERIFIED",
+        verifiedAt,
       },
     }),
     prisma.outlet.upsert({
       where: { code: "OUT-3072" },
-      update: {},
+      update: {
+        normalizedName: normalizeOutletName("City Mart Dhanmondi"),
+        verificationStatus: "VERIFIED",
+        verifiedAt,
+      },
       create: {
         name: "City Mart Dhanmondi",
+        normalizedName: normalizeOutletName("City Mart Dhanmondi"),
         code: "OUT-3072",
         address: "Road 27, Dhanmondi",
         latitude: 23.7518,
         longitude: 90.3745,
+        verificationStatus: "VERIFIED",
+        verifiedAt,
       },
     }),
   ]);
@@ -216,3 +238,7 @@ async function main() {
 main()
   .catch(console.error)
   .finally(() => prisma.$disconnect());
+
+function normalizeOutletName(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, " ");
+}
