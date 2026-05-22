@@ -1,8 +1,8 @@
 "use client";
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SessionProvider } from "next-auth/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -16,6 +16,19 @@ export function Providers({ children }: { children: React.ReactNode }) {
         },
       }),
   );
+
+  useEffect(() => {
+    return onlineManager.setEventListener((setOnline) => {
+      const updateOnline = () => setOnline(navigator.onLine);
+      updateOnline();
+      window.addEventListener("online", updateOnline);
+      window.addEventListener("offline", updateOnline);
+      return () => {
+        window.removeEventListener("online", updateOnline);
+        window.removeEventListener("offline", updateOnline);
+      };
+    });
+  }, []);
 
   return (
     <SessionProvider>

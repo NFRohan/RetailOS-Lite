@@ -12,11 +12,11 @@ Goal: make the AI and worker backend production-ready enough to hand off cleanly
 | LLM POSM analysis | Working through OpenAI vision | Add timeout/error tests and prompt fixture tests |
 | Compliance scoring | Working deterministic rules | Add unit tests for scoring bands |
 | BullMQ worker | Working with JSON repository | Swap to Prisma repository |
-| Fraud detection | Partial | EXIF, exact duplicate, GPS, timestamp exist; add blur and perceptual hash if time allows |
+| Fraud detection | Core implemented | EXIF, exact duplicate, perceptual duplicate, GPS, and timestamp exist; blur intentionally skipped |
 | Visit report text | Working | Add embedding worker and pgvector |
 | RBAC | Designed only | Add simple `REP`, `SUPERVISOR`, `ADMIN` enforcement |
 | Dashboard data | Backend summary shape exists | Build Next.js pages and API routes |
-| Offline sync | Designed only | Implement IndexedDB outbox |
+| Offline sync | Implemented | Add manual browser recording if demo time allows |
 | Observability | Designed, not wired | Add OTEL traces and LGTM stack |
 | Deployment | Not complete | Deploy frontend, API, worker, Redis, Postgres |
 
@@ -295,33 +295,32 @@ Offline capture is an impressive bonus and realistic for field reps.
 
 Deliverables:
 
-- IndexedDB store for visit drafts, image blobs, and sync outbox.
-- Client-generated ids for offline visits.
-- Online/offline indicator.
-- Background sync loop that uploads pending visits when online.
-- Conflict-safe submit flow using idempotency keys.
+- IndexedDB store for visit drafts, image blobs, and sync outbox. `DONE`
+- Client-generated ids for offline visits. `DONE`
+- Online/offline indicator. `DONE`
+- Background sync loop that uploads pending visits when online. `DONE`
+- Conflict-safe submit flow using idempotency keys. `DONE`
 
 Definition of Done:
 
 - Rep can create visit while offline.
 - Rep can attach shelf image while offline.
-- Draft survives page refresh.
-- When online, image uploads first, visit submits second, worker job enqueues third.
-- UI shows `Pending sync`, `Uploading`, `Analyzing`, `Synced`, or `Failed`.
+- Draft survives page refresh through IndexedDB.
+- When online, visit is created, images upload, and worker job enqueues.
+- UI shows `Pending sync`, `Syncing`, or `Retry needed`; synced visits move into normal visit history.
 
 Tests:
 
 - Browser test with network disabled creates a draft.
 - Browser test restores network and confirms sync.
-- Unit test outbox retry order.
 - Manual test verifies no duplicate visits after repeated sync clicks.
 
 Suggested stack:
 
 ```text
-Dexie or idb-keyval
-TanStack Query persistence
-client UUID/CUID ids
+Native IndexedDB
+TanStack Query sync loop
+client-generated visit ids
 idempotency key per visit submit
 ```
 

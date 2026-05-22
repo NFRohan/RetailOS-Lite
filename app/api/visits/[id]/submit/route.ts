@@ -26,6 +26,10 @@ export async function POST(_request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Upload at least one shelf image" }, { status: 400 });
   }
 
+  if (visit.status !== "PENDING") {
+    return NextResponse.json({ status: visit.status, traceId: null });
+  }
+
   await prisma.visit.update({
     where: { id: visitId },
     data: { status: "ANALYZING" },

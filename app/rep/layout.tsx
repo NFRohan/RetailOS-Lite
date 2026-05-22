@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { signOut } from "@/lib/auth";
+import { OfflineSyncStatus } from "@/components/offline-sync-status";
+import { OfflineVisitSyncProvider } from "@/components/offline-visit-sync-provider";
 import { Button } from "@/components/ui/button";
 import { ClipboardList, LogOut, Plus } from "lucide-react";
 
 export default function RepLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-rep-bg">
+      <OfflineVisitSyncProvider />
       <header className="sticky top-0 z-40 border-b border-[#d6ddea] bg-white/90 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-lg items-center justify-between px-4">
           <Link href="/rep/visits" className="leading-tight">
@@ -33,7 +36,10 @@ export default function RepLayout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main className="mx-auto max-w-lg px-4 pb-28 pt-6">{children}</main>
+      <main className="mx-auto max-w-lg px-4 pb-28 pt-6">
+        <OfflineSyncStatus />
+        {children}
+      </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-[#d6ddea] bg-white/95 px-4 py-3 shadow-[0_-8px_24px_rgba(2,43,58,0.08)] backdrop-blur">
         <div className="mx-auto grid max-w-lg grid-cols-3 items-center gap-3">

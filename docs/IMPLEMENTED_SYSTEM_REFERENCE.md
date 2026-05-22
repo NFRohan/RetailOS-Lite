@@ -8,6 +8,8 @@ Use this as the handoff reference for the Next.js team.
 
 ```text
 Visit image
+  -> optional IndexedDB offline outbox
+  -> online sync through Next.js APIs
   -> FastAPI AI service
   -> local YOLO or Modal GPU YOLO
   -> optional OpenAI vision POSM analysis
@@ -27,7 +29,8 @@ Implemented modules:
 | OpenAI POSM analysis | Implemented | Optional vision LLM layer for Olympic POSM and summary |
 | Compliance scoring | Implemented | Deterministic rules with score, status, reasons, action |
 | Worker orchestration | Implemented | BullMQ `analyze_visit` job calls AI service and saves output |
-| Fraud checks | Partially implemented | SHA-256 duplicate support, GPS mismatch, timestamp anomaly, EXIF GPS/time checks |
+| Fraud checks | Implemented | Exact duplicate, perceptual duplicate, GPS mismatch, timestamp anomaly, EXIF GPS/time checks |
+| Offline sync | Implemented | Rep visits queue in IndexedDB and sync through TanStack Query when online |
 | Visit report text | Implemented | Builds fact-heavy text for later RAG embedding |
 | Embedding worker | Not implemented | Queue is created, but no consumer exists yet |
 | Real database repository | Not implemented | Current repository is JSON-file backed for local testing |
@@ -43,6 +46,8 @@ Implemented modules:
 | Worker | `worker/src/index.ts` | Runs BullMQ job processor |
 | Worker job | `worker/src/jobs/analyzeVisit.ts` | Full async visit analysis lifecycle |
 | Fraud service | `worker/src/services/fraud.ts` | Duplicate hash, GPS, timestamp, EXIF checks |
+| Offline outbox | `lib/offline-visits.ts` | IndexedDB queue and idempotent visit sync client |
+| Offline sync hook | `hooks/use-offline-visit-sync.ts` | TanStack Query queue polling and retry orchestration |
 | Outcome summary | `worker/src/services/outcomeSummary.ts` | Dashboard-ready final explanation |
 | Report builder | `worker/src/services/reportBuilder.ts` | RAG-ready retrieval text |
 | Modal endpoint | `modal_gpu/yolo_endpoint.py` | GPU YOLO detection endpoint |

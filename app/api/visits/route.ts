@@ -6,6 +6,14 @@ import { prisma } from "@/lib/prisma";
 import { serializeVisitDetail, serializeVisitListItem } from "@/lib/visits";
 import { NextResponse } from "next/server";
 
+const visitDetailInclude = {
+  outlet: true,
+  rep: { select: { id: true, name: true, email: true } },
+  images: true,
+  aiResult: true,
+  fraudSignals: true,
+} satisfies Prisma.VisitInclude;
+
 export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session?.user) {
@@ -71,6 +79,19 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json();
   try {
+    if (typeof body.clientVisitId === "string" && body.clientVisitId.trim()) {
+      const existingVisit = await prisma.visit.findUnique({
+        where: { clientVisitId: body.clientVisitId },
+        include: visitDetailInclude,
+      });
+      if (existingVisit) {
+        if (existingVisit.repId !== session.user.id) {
+          return NextResponse.json({ error: "Client visit id already belongs to another rep" }, { status: 409 });
+        }
+        return NextResponse.json(serializeVisitDetail(existingVisit));
+      }
+    }
+
     const checkInLat = numberOrNull(body.checkInLat);
     const checkInLng = numberOrNull(body.checkInLng);
     const outletResolution = await resolveOutletForVisit({
@@ -93,13 +114,7 @@ export async function POST(request: NextRequest) {
         notes: body.notes,
         status: "PENDING",
       },
-      include: {
-        outlet: true,
-        rep: { select: { id: true, name: true, email: true } },
-        images: true,
-        aiResult: true,
-        fraudSignals: true,
-      },
+      include: visitDetailInclude,
     });
 
     if (outletResolution.created) {

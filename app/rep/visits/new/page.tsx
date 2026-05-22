@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PhotoUploader, type PhotoFile } from "@/components/photo-uploader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,8 +11,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  createClientVisitId,
+  isRetryableVisitSyncError,
+  queueOfflineVisitSubmission,
+  submitVisitOnline,
+  type OfflineVisitPayload,
+} from "@/lib/offline-visits";
 import { cn } from "@/lib/utils";
-import { Camera, Check, ChevronLeft, Loader2, MapPin, Search, ShieldCheck, Store, X } from "lucide-react";
+import { Camera, Check, ChevronLeft, CloudOff, Loader2, MapPin, Search, ShieldCheck, Store, X } from "lucide-react";
 
 const STEPS = ["Outlet", "Photos", "Review"];
 
@@ -34,6 +41,7 @@ type OutletSearchResponse = {
 
 export default function NewVisitPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [step, setStep] = useState(0);
   const [shopName, setShopName] = useState("");
   const [selectedOutletId, setSelectedOutletId] = useState("");
@@ -43,10 +51,12 @@ export default function NewVisitPage() {
   const [gpsLoading, setGpsLoading] = useState(false);
   const [photos, setPhotos] = useState<PhotoFile[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
   const [error, setError] = useState("");
 
   const normalizedShopName = shopName.trim();
-  const canSearchOutlets = Boolean(normalizedShopName.length >= 2 && gps);
+  const canSearchOutlets = Boolean(isOnline && normalizedShopName.length >= 2 && gps);
+  const submitMutation = useMutation({ mutationFn: submitVisitOnline });
   const { data: outletSearch, isFetching: searchingOutlets } = useQuery<OutletSearchResponse>({
     queryKey: ["outlet-search", normalizedShopName, gps?.lat.toFixed(5), gps?.lng.toFixed(5)],
     enabled: canSearchOutlets,
@@ -72,6 +82,17 @@ export default function NewVisitPage() {
     setSelectedOutletId("");
     setForceNewOutlet(false);
   }, [normalizedShopName, gps?.lat, gps?.lng]);
+
+  useEffect(() => {
+    const updateOnline = () => setIsOnline(navigator.onLine);
+    updateOnline();
+    window.addEventListener("online", updateOnline);
+    window.addEventListener("offline", updateOnline);
+    return () => {
+      window.removeEventListener("online", updateOnline);
+      window.removeEventListener("offline", updateOnline);
+    };
+  }, []);
 
   useEffect(() => {
     if (outletSearch?.autoMatch) {
@@ -103,44 +124,55 @@ export default function NewVisitPage() {
   async function handleSubmit() {
     setSubmitting(true);
     setError("");
+    const payload: OfflineVisitPayload = {
+      clientVisitId: createClientVisitId(),
+      outletName: normalizedShopName,
+      outletId: selectedOutletId || undefined,
+      forceNewOutlet: forceNewOutlet || !selectedOutletId,
+      checkInLat: gps?.lat ?? null,
+      checkInLng: gps?.lng ?? null,
+      clientTimestamp: new Date().toISOString(),
+      notes,
+    };
+    const syncInput = {
+      payload,
+      photos: photos.map((photo) => ({
+        file: photo.file,
+        hash: photo.hash,
+        name: photo.file.name,
+        type: photo.file.type,
+        lastModified: photo.file.lastModified,
+      })),
+    };
+
     try {
-      const visitRes = await fetch("/api/visits", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          outletName: shopName.trim(),
-          outletId: selectedOutletId || undefined,
-          forceNewOutlet: forceNewOutlet || !selectedOutletId,
-          checkInLat: gps?.lat,
-          checkInLng: gps?.lng,
-          clientTimestamp: new Date().toISOString(),
-          notes,
-        }),
-      });
-      if (!visitRes.ok) throw new Error("Failed to create visit");
-      const visit = await visitRes.json();
-
-      for (const photo of photos) {
-        const form = new FormData();
-        form.append("file", photo.file);
-        form.append("imageHash", photo.hash);
-        const imgRes = await fetch(`/api/visits/${visit.id}/images`, { method: "POST", body: form });
-        if (!imgRes.ok) throw new Error("Failed to upload image");
-      }
-
-      const submitRes = await fetch(`/api/visits/${visit.id}/submit`, { method: "POST" });
-      if (!submitRes.ok) throw new Error("Failed to submit visit");
-
-      router.push(`/rep/visits/${visit.id}`);
+      const result = await submitMutation.mutateAsync(syncInput);
+      await queryClient.invalidateQueries({ queryKey: ["visits"] });
+      router.push(`/rep/visits/${result.visitId}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
-      setSubmitting(false);
+      if (isRetryableVisitSyncError(err)) {
+        try {
+          await queueOfflineVisitSubmission(syncInput);
+          await queryClient.invalidateQueries({ queryKey: ["offline-visits"] });
+          router.push("/rep/visits?queued=1");
+          return;
+        } catch (queueError) {
+          setError(queueError instanceof Error ? queueError.message : "Could not save visit offline.");
+        }
+      } else {
+        setError(err instanceof Error ? err.message : "Something went wrong");
+      }
     }
+
+    setSubmitting(false);
   }
 
   const suggestions = outletSearch?.candidates ?? [];
   const selectedCandidate = suggestions.find((candidate) => candidate.id === selectedOutletId) ?? null;
-  const canCreateImplicitly = Boolean(outletSearch && suggestions.length === 0 && !searchingOutlets);
+  const canCreateImplicitly = Boolean(
+    (outletSearch && suggestions.length === 0 && !searchingOutlets) ||
+      (!isOnline && normalizedShopName.length >= 2 && gps),
+  );
   const canContinueFromOutlet = Boolean(
     normalizedShopName.length >= 2 && gps && (selectedOutletId || forceNewOutlet || canCreateImplicitly),
   );
@@ -235,6 +267,7 @@ export default function NewVisitPage() {
               autoMatch={outletSearch?.autoMatch ?? null}
               forceNewOutlet={forceNewOutlet}
               gpsCaptured={Boolean(gps)}
+              isOnline={isOnline}
               isLoading={searchingOutlets}
               onCreateNew={() => {
                 setSelectedOutletId("");
@@ -332,6 +365,7 @@ export default function NewVisitPage() {
                 <ShieldCheck className="mt-0.5 h-5 w-5 text-teal" />
                 <p className="text-sm text-muted-foreground">
                   This will run YOLO shelf detection, POSM LLM review, compliance scoring, and fraud checks.
+                  {!isOnline && " Because you are offline, the visit will queue locally first."}
                 </p>
               </div>
             </div>
@@ -346,10 +380,10 @@ export default function NewVisitPage() {
                 {submitting ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Submitting...
+                    {isOnline ? "Submitting..." : "Saving..."}
                   </>
                 ) : (
-                  "Submit Visit"
+                  isOnline ? "Submit Visit" : "Save Offline"
                 )}
               </Button>
             </div>
@@ -364,6 +398,7 @@ function OutletMatchPanel({
   autoMatch,
   forceNewOutlet,
   gpsCaptured,
+  isOnline,
   isLoading,
   onCreateNew,
   onSelect,
@@ -376,6 +411,7 @@ function OutletMatchPanel({
   autoMatch: OutletSearchCandidate | null;
   forceNewOutlet: boolean;
   gpsCaptured: boolean;
+  isOnline: boolean;
   isLoading: boolean;
   onCreateNew: () => void;
   onSelect: (candidateId: string) => void;
@@ -397,6 +433,36 @@ function OutletMatchPanel({
     return (
       <div className="rounded-2xl border border-dashed border-[#d6ddea] bg-[#f9f9ff] p-4 text-sm text-muted-foreground">
         Enter at least 2 characters to search nearby shops.
+      </div>
+    );
+  }
+
+  if (!isOnline) {
+    return (
+      <div className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-amber-700">
+            <CloudOff className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-amber-950">Offline outlet capture</p>
+            <p className="mt-1 text-sm text-amber-800">
+              Nearby matching will run when this visit syncs. The outlet may require supervisor verification.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          className={cn(
+            "w-full rounded-xl border border-dashed p-3 text-left text-sm transition-colors",
+            forceNewOutlet
+              ? "border-amber-500 bg-white text-amber-950"
+              : "border-amber-300 bg-white/70 text-amber-900 hover:border-amber-500 hover:bg-white",
+          )}
+          onClick={onCreateNew}
+        >
+          Save <span className="font-semibold">{shopName}</span> as an offline pending outlet.
+        </button>
       </div>
     );
   }
@@ -423,8 +489,22 @@ function OutletMatchPanel({
       {isLoading && <p className="text-sm text-muted-foreground">Searching nearby master data...</p>}
 
       {!isLoading && searchReady && suggestions.length === 0 && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-          No nearby match found. This visit can continue as a new pending outlet for supervisor review.
+        <div className="space-y-2">
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            No nearby match found. This visit can continue as a new pending outlet for supervisor review.
+          </div>
+          <button
+            type="button"
+            className={cn(
+              "w-full rounded-xl border border-dashed p-3 text-left text-sm transition-colors",
+              forceNewOutlet
+                ? "border-amber-400 bg-amber-50 text-amber-900"
+                : "border-[#c1c7cc] bg-white text-muted-foreground hover:border-amber-400 hover:bg-amber-50",
+            )}
+            onClick={onCreateNew}
+          >
+            Submit <span className="font-semibold">{shopName}</span> as a new pending outlet.
+          </button>
         </div>
       )}
 
