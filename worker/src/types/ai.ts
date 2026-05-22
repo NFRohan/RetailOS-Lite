@@ -52,6 +52,14 @@ export type AnalyzeShelfResponse = {
       evidence: string;
       missingReason?: string | null;
     };
+    countAudit: {
+      olympicEstimate?: number | null;
+      competitorEstimate?: number | null;
+      visualOlympicShare?: number | null;
+      yoloCountReliable: boolean;
+      confidence: number;
+      rationale: string;
+    };
     otherPromotionalMaterial: string;
     shelfQuality: string;
     visibilityNotes: string;

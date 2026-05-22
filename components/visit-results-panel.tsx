@@ -21,8 +21,29 @@ export function VisitResultsPanel({ visit, outcome }: Props) {
   const rawUrl = visit.images[0]?.url ?? "";
   const overlayUrl = visit.aiResult?.overlayImageUrl;
   const counts = outcome?.counts ?? { olympic: 0, competitor: 0, total: 0 };
-  const totalProducts = counts.total || counts.olympic + counts.competitor;
-  const olympicShare = totalProducts > 0 ? Math.round((counts.olympic / totalProducts) * 100) : 0;
+  const countAudit = outcome?.countAudit;
+  const useCountAudit = Boolean(
+    countAudit &&
+      !countAudit.yoloCountReliable &&
+      countAudit.confidence >= 0.65 &&
+      countAudit.olympicEstimate !== null &&
+      countAudit.olympicEstimate !== undefined &&
+      countAudit.competitorEstimate !== null &&
+      countAudit.competitorEstimate !== undefined,
+  );
+  const displayCounts = useCountAudit
+    ? {
+        olympic: Math.max(0, countAudit?.olympicEstimate ?? 0),
+        competitor: Math.max(0, countAudit?.competitorEstimate ?? 0),
+      }
+    : { olympic: counts.olympic, competitor: counts.competitor };
+  const totalProducts = displayCounts.olympic + displayCounts.competitor;
+  const olympicShare =
+    useCountAudit && countAudit?.visualOlympicShare !== null && countAudit?.visualOlympicShare !== undefined
+      ? Math.round(Math.max(0, Math.min(1, countAudit.visualOlympicShare)) * 100)
+      : totalProducts > 0
+        ? Math.round((displayCounts.olympic / totalProducts) * 100)
+        : 0;
   const fraudSignals =
     outcome?.fraudSignals ??
     visit.fraudSignals.map((s) => ({ type: s.type, severity: s.severity, message: s.message }));
@@ -125,7 +146,12 @@ export function VisitResultsPanel({ visit, outcome }: Props) {
             <div className="flex items-center justify-center">
               <ComplianceRing score={olympicShare} status={status} size={132} />
             </div>
-            <OlympicCompetitorChart olympic={counts.olympic} competitor={counts.competitor} />
+            <OlympicCompetitorChart olympic={displayCounts.olympic} competitor={displayCounts.competitor} />
+            {useCountAudit && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-800">
+                OpenAI visual audit adjusted YOLO counts: {countAudit?.rationale}
+              </div>
+            )}
             <div className="rounded-lg bg-[#eef2fb] p-3 text-xs text-muted-foreground">
               Olympic visibility is {olympicShare}%; competitor presence is {Math.max(0, 100 - olympicShare)}%.
             </div>

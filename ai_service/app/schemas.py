@@ -97,10 +97,23 @@ class POSMAnalysis(BaseModel):
         populate_by_name = True
 
 
+class CountAudit(BaseModel):
+    olympic_estimate: int | None = Field(default=None, alias="olympicEstimate")
+    competitor_estimate: int | None = Field(default=None, alias="competitorEstimate")
+    visual_olympic_share: float | None = Field(default=None, alias="visualOlympicShare")
+    yolo_count_reliable: bool = Field(..., alias="yoloCountReliable")
+    confidence: float
+    rationale: str
+
+    class Config:
+        populate_by_name = True
+
+
 class LLMRetailAnalysis(BaseModel):
     provider: str
     model: str
     posm: POSMAnalysis
+    count_audit: CountAudit = Field(..., alias="countAudit")
     other_promotional_material: str = Field(..., alias="otherPromotionalMaterial")
     shelf_quality: str = Field(..., alias="shelfQuality")
     visibility_notes: str = Field(..., alias="visibilityNotes")

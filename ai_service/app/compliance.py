@@ -1,4 +1,4 @@
-from .schemas import ComplianceResult, LLMRetailAnalysis, YoloResponse
+from .schemas import ComplianceResult, DetectionCounts, LLMRetailAnalysis, YoloResponse
 
 
 def status_for_score(score: int) -> str:
@@ -14,25 +14,29 @@ def status_for_score(score: int) -> str:
 def evaluate_compliance(yolo: YoloResponse, llm: LLMRetailAnalysis | None = None) -> ComplianceResult:
     score = 100
     reasons: list[str] = []
+    counts, visibility_ratio, used_count_audit = effective_shelf_metrics(yolo, llm)
 
-    if yolo.counts.total == 0:
+    if used_count_audit:
+        reasons.append("OpenAI visual audit adjusted unreliable YOLO count estimates.")
+
+    if counts.total == 0:
         score -= 75
         reasons.append("No shelf products were detected in the image.")
-    elif yolo.counts.olympic == 0:
+    elif counts.olympic == 0:
         score -= 45
         reasons.append("No Olympic products were detected.")
 
-    if yolo.metrics.visibility_ratio < 0.25:
+    if visibility_ratio < 0.25:
         score -= 25
         reasons.append("Olympic visibility is below the minimum target.")
-    elif yolo.metrics.visibility_ratio < 0.5:
+    elif visibility_ratio < 0.5:
         score -= 15
         reasons.append("Olympic visibility is weaker than desired.")
 
-    if yolo.counts.competitor > yolo.counts.olympic and yolo.counts.competitor >= 3:
+    if counts.competitor > counts.olympic and counts.competitor >= 3:
         score -= 20
         reasons.append("Competitor products dominate visible shelf space.")
-    elif yolo.counts.competitor > 0:
+    elif counts.competitor > 0:
         score -= 5
         reasons.append("Competitor products are present.")
 
@@ -42,7 +46,7 @@ def evaluate_compliance(yolo: YoloResponse, llm: LLMRetailAnalysis | None = None
     elif llm and llm.posm.detected:
         reasons.append("POSM appears to be present.")
 
-    if yolo.counts.olympic > 0 and yolo.metrics.visibility_ratio >= 0.5:
+    if counts.olympic > 0 and visibility_ratio >= 0.5:
         reasons.append("Olympic products have acceptable shelf visibility.")
 
     score = max(0, min(100, score))
@@ -61,6 +65,33 @@ def evaluate_compliance(yolo: YoloResponse, llm: LLMRetailAnalysis | None = None
         reasons=reasons or ["Shelf appears compliant based on current detection results."],
         recommendedAction=recommended_action,
     )
+
+
+def effective_shelf_metrics(
+    yolo: YoloResponse,
+    llm: LLMRetailAnalysis | None = None,
+) -> tuple[DetectionCounts, float, bool]:
+    audit = llm.count_audit if llm else None
+    if (
+        audit
+        and not audit.yolo_count_reliable
+        and audit.confidence >= 0.65
+        and audit.olympic_estimate is not None
+        and audit.competitor_estimate is not None
+    ):
+        olympic = max(0, audit.olympic_estimate)
+        competitor = max(0, audit.competitor_estimate)
+        total = olympic + competitor
+        visibility_ratio = audit.visual_olympic_share
+        if visibility_ratio is None:
+            visibility_ratio = olympic / total if total else 0.0
+        return (
+            DetectionCounts(olympic=olympic, competitor=competitor, total=total),
+            max(0.0, min(1.0, visibility_ratio)),
+            True,
+        )
+
+    return yolo.counts, yolo.metrics.visibility_ratio, False
 
 
 def build_supervisor_summary(

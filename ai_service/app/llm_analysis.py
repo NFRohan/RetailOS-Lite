@@ -5,7 +5,7 @@ import mimetypes
 import os
 
 from . import config
-from .schemas import LLMRetailAnalysis, POSMAnalysis, YoloResponse
+from .schemas import CountAudit, LLMRetailAnalysis, POSMAnalysis, YoloResponse
 
 
 POSM_SCHEMA = {
@@ -22,6 +22,26 @@ POSM_SCHEMA = {
             "required": ["detected", "confidence", "evidence", "missingReason"],
             "additionalProperties": False,
         },
+        "countAudit": {
+            "type": "object",
+            "properties": {
+                "olympicEstimate": {"type": ["integer", "null"]},
+                "competitorEstimate": {"type": ["integer", "null"]},
+                "visualOlympicShare": {"type": ["number", "null"]},
+                "yoloCountReliable": {"type": "boolean"},
+                "confidence": {"type": "number"},
+                "rationale": {"type": "string"},
+            },
+            "required": [
+                "olympicEstimate",
+                "competitorEstimate",
+                "visualOlympicShare",
+                "yoloCountReliable",
+                "confidence",
+                "rationale",
+            ],
+            "additionalProperties": False,
+        },
         "shelfQuality": {"type": "string"},
         "otherPromotionalMaterial": {"type": "string"},
         "visibilityNotes": {"type": "string"},
@@ -31,6 +51,7 @@ POSM_SCHEMA = {
     },
     "required": [
         "posm",
+        "countAudit",
         "shelfQuality",
         "otherPromotionalMaterial",
         "visibilityNotes",
@@ -64,6 +85,7 @@ Analyze the shelf image for:
 - Olympic/Foodie POSM presence only: Olympic/Foodie branded posters, wobblers, shelf strips, danglers, signage, stickers, or promotional material.
 - Shelf quality: neatness, visibility, whether the products are easy to see.
 - Competitor pressure: whether competitor products visually dominate.
+- Count audit: conservative visible estimates for Olympic/Foodie products and competitor products.
 - Supervisor action: short, operational, and practical.
 
 Use these YOLO detections as grounding facts:
@@ -78,7 +100,14 @@ Important POSM rule:
 - Ignore unrelated POSM from other brands such as Nescafe, Pran, Mr. Noodles, or generic store signage.
 - If non-Olympic/Foodie promotional material is visible, describe it in otherPromotionalMaterial but keep posm.detected false unless Olympic/Foodie branding is visible.
 
-Do not invent exact product counts beyond the YOLO facts. If Olympic/Foodie POSM is not clearly visible, mark posm.detected false.
+Important count audit rule:
+- YOLO can miss small, hanging, occluded, or partially visible noodle packs.
+- Use countAudit for conservative approximate visible counts only, not hidden stock.
+- Set countAudit.yoloCountReliable false if the YOLO counts are visibly under-counting or over-counting the scene.
+- Set countAudit.visualOlympicShare from 0 to 1 based on visible Olympic/Foodie share-of-shelf.
+- If the image is too cluttered to estimate, use null estimates, confidence below 0.5, and explain why.
+
+Do not invent exact precise counts. If Olympic/Foodie POSM is not clearly visible, mark posm.detected false.
 Keep supervisorSummary under 25 words.
 """.strip()
 
@@ -139,6 +168,7 @@ def analyze_retail_image(
         provider="openai",
         model=config.LLM_MODEL,
         posm=POSMAnalysis(**parsed["posm"]),
+        countAudit=CountAudit(**parsed["countAudit"]),
         otherPromotionalMaterial=parsed["otherPromotionalMaterial"],
         shelfQuality=parsed["shelfQuality"],
         visibilityNotes=parsed["visibilityNotes"],

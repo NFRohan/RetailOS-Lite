@@ -16,6 +16,14 @@ export type OutcomeSummary = {
     evidence: string;
     missingReason?: string | null;
   };
+  countAudit?: {
+    olympicEstimate?: number | null;
+    competitorEstimate?: number | null;
+    visualOlympicShare?: number | null;
+    yoloCountReliable: boolean;
+    confidence: number;
+    rationale: string;
+  };
   fraudSignals: Array<{ type: string; severity: string; message: string }>;
 };
 

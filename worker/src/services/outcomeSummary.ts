@@ -21,6 +21,14 @@ export type VisitAnalysisOutcomeSummary = {
     evidence: string;
     missingReason?: string | null;
   };
+  countAudit?: {
+    olympicEstimate?: number | null;
+    competitorEstimate?: number | null;
+    visualOlympicShare?: number | null;
+    yoloCountReliable: boolean;
+    confidence: number;
+    rationale: string;
+  };
   fraudSignals: Array<{
     type: string;
     severity: string;
@@ -50,6 +58,7 @@ export function buildOutcomeSummary(
       evidence: analysis.llm?.posm.evidence ?? "POSM analysis not available.",
       missingReason: analysis.llm?.posm.missingReason,
     },
+    countAudit: analysis.llm?.countAudit,
     fraudSignals: fraudSignals.map((signal) => ({
       type: signal.type,
       severity: signal.severity,
@@ -68,6 +77,13 @@ export function printOutcomeSummary(summary: VisitAnalysisOutcomeSummary): void 
     `Counts: Olympic=${summary.counts.olympic}, Competitor=${summary.counts.competitor}, Total=${summary.counts.total}`,
   );
   console.log(`Visibility ratio: ${summary.visibilityRatio}`);
+  if (summary.countAudit) {
+    console.log(
+      `OpenAI count audit: reliable=${summary.countAudit.yoloCountReliable}, confidence=${summary.countAudit.confidence}, ` +
+        `Olympic=${summary.countAudit.olympicEstimate ?? "unknown"}, ` +
+        `Competitor=${summary.countAudit.competitorEstimate ?? "unknown"}`,
+    );
+  }
   console.log(`POSM: ${summary.posm.detected === null ? "unknown" : summary.posm.detected ? "detected" : "missing"}`);
   console.log(`POSM evidence: ${summary.posm.evidence}`);
 
@@ -85,4 +101,3 @@ export function printOutcomeSummary(summary: VisitAnalysisOutcomeSummary): void 
     }
   }
 }
-
