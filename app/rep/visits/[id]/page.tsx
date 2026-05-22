@@ -1,16 +1,18 @@
 "use client";
 
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { AnalyzingPipeline } from "@/components/analyzing-pipeline";
 import { VisitResultsPanel } from "@/components/visit-results-panel";
 import { VisitStatusBadge } from "@/components/visit-status-badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { VisitDetail } from "@/lib/types";
 import { TERMINAL_STATUSES } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
-import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, ChevronLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export default function RepVisitDetailPage() {
@@ -39,24 +41,34 @@ export default function RepVisitDetailPage() {
   if (isLoading) {
     return (
       <div className="space-y-4">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-32 w-full rounded-xl" />
+        <Skeleton className="h-8 w-48 bg-white" />
+        <Skeleton className="h-32 w-full rounded-3xl bg-white" />
       </div>
     );
   }
 
   if (!visit) {
-    return <p className="text-destructive">Visit not found</p>;
+    return <p className="text-rose-700">Visit not found</p>;
   }
 
   const outcome = visit.aiResult?.outcomeSummary ?? null;
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold">{visit.outlet.name}</h1>
-        <p className="text-sm text-muted-foreground">{formatDate(visit.createdAt)}</p>
-        <div className="mt-2">
+      <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-navy">
+        <Link href="/rep/visits">
+          <ChevronLeft className="mr-1 h-4 w-4" />
+          My Visits
+        </Link>
+      </Button>
+
+      <div className="rounded-3xl border border-[#d6ddea] bg-white p-5 shadow-[0_8px_28px_rgba(2,43,58,0.06)]">
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-teal">Visit Intelligence</p>
+        <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-navy">{visit.outlet.name}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {visit.outlet.code} / {formatDate(visit.createdAt)}
+        </p>
+        <div className="mt-4">
           <VisitStatusBadge status={visit.status} />
         </div>
       </div>
@@ -64,27 +76,27 @@ export default function RepVisitDetailPage() {
       {visit.status === "ANALYZING" && <AnalyzingPipeline activeStep={pipelineStep} />}
 
       {visit.status === "COMPLETE" && (
-        <Card className="border-emerald-500/30 bg-emerald-500/5">
+        <Card className="border-emerald-200 bg-emerald-50">
           <CardContent className="flex items-center gap-3 p-4">
-            <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-            <p className="text-sm font-medium text-emerald-700">Analysis complete</p>
+            <CheckCircle2 className="h-5 w-5 text-emerald-700" />
+            <p className="text-sm font-semibold text-emerald-800">Analysis complete</p>
           </CardContent>
         </Card>
       )}
 
       {visit.status === "FLAGGED" && (
-        <Card className="border-rose-500/30 bg-rose-500/5">
+        <Card className="border-rose-200 bg-rose-50">
           <CardContent className="flex items-center gap-3 p-4">
-            <AlertCircle className="h-5 w-5 text-rose-500" />
-            <p className="text-sm font-medium text-rose-700">Visit flagged — review required</p>
+            <AlertCircle className="h-5 w-5 text-rose-700" />
+            <p className="text-sm font-semibold text-rose-800">Visit flagged - supervisor review required</p>
           </CardContent>
         </Card>
       )}
 
       {visit.status === "FAILED" && (
-        <Card className="border-destructive/30 bg-destructive/5">
+        <Card className="border-rose-200 bg-rose-50">
           <CardContent className="p-4">
-            <p className="text-sm text-destructive">Analysis failed. Contact your supervisor.</p>
+            <p className="text-sm font-semibold text-rose-800">Analysis failed. Contact your supervisor.</p>
           </CardContent>
         </Card>
       )}
