@@ -6,6 +6,9 @@ import { analyzeVisit } from "./jobs/analyzeVisit.js";
 import { JsonVisitRepository } from "./repositories/jsonRepository.js";
 import { PrismaVisitRepository } from "./repositories/prismaRepository.js";
 import type { AnalyzeVisitJobData } from "./types/domain.js";
+import { logError, logWarn } from "./observability/logger.js";
+import { jobsFailed, jobRetries, refreshQueueMetrics } from "./observability/metrics.js";
+import { captureWorkerException } from "./observability/sentry.js";
 
 type AnalyzeVisitDeadLetterJobData = {
   failedAt: string;
@@ -49,6 +52,7 @@ export type WorkerRuntime = {
 export function createAnalyzeVisitWorker(connection = createRedisConnection()) {
   validateWorkerConfig();
   const aiService = new AIServiceClient(config.aiServiceUrl, config.aiServiceApiKey);
+  const analyzeQueue = new Queue<AnalyzeVisitJobData>(config.analyzeVisitQueueName, { connection });
   const embedQueue = new Queue(config.embedVisitReportQueueName, { connection });
   const deadLetterQueue = new Queue<AnalyzeVisitDeadLetterJobData>(config.analyzeVisitDeadLetterQueueName, {
     connection,
@@ -87,6 +91,19 @@ export function createAnalyzeVisitWorker(connection = createRedisConnection()) {
   );
 
   worker.on("failed", (job, error) => {
+    jobsFailed.labels(config.analyzeVisitQueueName, "analyze_visit").inc();
+    if (job && !isFinalFailure(job)) {
+      jobRetries.labels(config.analyzeVisitQueueName).inc();
+      logWarn("analyze visit job will retry", {
+        correlationId: job.data.traceId,
+        visitId: job.data.visitId,
+        jobId: job.id,
+        stage: "analyze_visit",
+        status: "retrying",
+        attemptsMade: job.attemptsMade,
+        error: error.message,
+      });
+    }
     if (!job || !isFinalFailure(job)) return;
     void addToDeadLetterQueue(deadLetterQueue, job, error);
   });
@@ -96,7 +113,8 @@ export function createAnalyzeVisitWorker(connection = createRedisConnection()) {
     async (job) => {
       const repository = await createRepository();
       const report = await repository.getVisitReport(job.data.visitId);
-      await aiService.indexVisitReport(report);
+      const correlationId = `embed_${job.data.visitId}`;
+      await aiService.indexVisitReport(report, { correlationId, jobId: job.id });
       await repository.addEvent({
         visitId: job.data.visitId,
         jobId: job.id,
@@ -116,17 +134,29 @@ export function createAnalyzeVisitWorker(connection = createRedisConnection()) {
   );
 
   embedWorker.on("failed", (job, error) => {
-    console.error(
-      JSON.stringify({
-        event: "visit_report_index_failed",
-        visitId: job?.data.visitId,
-        jobId: job?.id,
-        error: error.message,
-      }),
-    );
+    jobsFailed.labels(config.embedVisitReportQueueName, "embedding").inc();
+    logError(error, "visit report index failed", {
+      correlationId: job ? `embed_${job.data.visitId}` : undefined,
+      visitId: job?.data.visitId,
+      jobId: job?.id,
+      stage: "embedding",
+      status: "error",
+    });
+    captureWorkerException(error, {
+      correlationId: job ? `embed_${job.data.visitId}` : undefined,
+      visitId: job?.data.visitId,
+      jobId: job?.id,
+      stage: "embedding",
+    });
   });
 
-  return { worker, embedWorker, embedQueue, deadLetterQueue };
+  setInterval(() => {
+    void refreshQueueMetrics([analyzeQueue, embedQueue]).catch((error) => {
+      logError(error, "queue metrics refresh failed", { stage: "queue", status: "error" });
+    });
+  }, 5000).unref();
+
+  return { worker, embedWorker, analyzeQueue, embedQueue, deadLetterQueue };
 }
 
 export function createAnalyzeVisitQueueEvents(connection = createRedisConnection()) {
@@ -137,7 +167,7 @@ export function createAnalyzeVisitRuntime(): WorkerRuntime {
   validateWorkerConfig();
   const workerConnection = createRedisConnection();
   const eventsConnection = createRedisConnection();
-  const { worker, embedWorker, embedQueue, deadLetterQueue } = createAnalyzeVisitWorker(workerConnection);
+  const { worker, embedWorker, analyzeQueue, embedQueue, deadLetterQueue } = createAnalyzeVisitWorker(workerConnection);
   const events = createAnalyzeVisitQueueEvents(eventsConnection);
 
   return {
@@ -145,7 +175,14 @@ export function createAnalyzeVisitRuntime(): WorkerRuntime {
     embedWorker,
     events,
     close: async () => {
-      await Promise.all([worker.close(), embedWorker.close(), events.close(), embedQueue.close(), deadLetterQueue.close()]);
+      await Promise.all([
+        worker.close(),
+        embedWorker.close(),
+        events.close(),
+        analyzeQueue.close(),
+        embedQueue.close(),
+        deadLetterQueue.close(),
+      ]);
       await Promise.all([workerConnection.quit(), eventsConnection.quit()]);
     },
   };
@@ -186,14 +223,28 @@ async function addToDeadLetterQueue(
         removeOnFail: false,
       },
     );
+    logWarn("analyze visit moved to dead letter queue", {
+      correlationId: job.data.traceId,
+      visitId: job.data.visitId,
+      jobId: job.id,
+      stage: "analyze_visit",
+      status: "dead_lettered",
+      attemptsMade: job.attemptsMade,
+      failedReason: job.failedReason || error.message,
+    });
   } catch (dlqError) {
-    console.error(
-      JSON.stringify({
-        event: "dead_letter_enqueue_failed",
-        jobId: job.id,
-        visitId: job.data.visitId,
-        error: dlqError instanceof Error ? dlqError.message : String(dlqError),
-      }),
-    );
+    logError(dlqError, "dead letter enqueue failed", {
+      correlationId: job.data.traceId,
+      jobId: job.id,
+      visitId: job.data.visitId,
+      stage: "analyze_visit",
+      status: "error",
+    });
+    captureWorkerException(dlqError, {
+      correlationId: job.data.traceId,
+      jobId: job.id,
+      visitId: job.data.visitId,
+      stage: "analyze_visit",
+    });
   }
 }

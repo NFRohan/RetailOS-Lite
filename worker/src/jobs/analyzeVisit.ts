@@ -7,6 +7,9 @@ import { buildVisitReport } from "../services/reportBuilder.js";
 import type { AnalyzeShelfResponse } from "../types/ai.js";
 import type { AnalyzeVisitJobData, AIResultRecord, Visit } from "../types/domain.js";
 import type { VisitRepository } from "../repositories/visitRepository.js";
+import { logError, logInfo } from "../observability/logger.js";
+import { fraudSignals as fraudSignalMetric, observeStage } from "../observability/metrics.js";
+import { captureWorkerException } from "../observability/sentry.js";
 
 type AnalyzeVisitDeps = {
   repository: VisitRepository;
@@ -23,6 +26,7 @@ export async function analyzeVisit(
 ): Promise<AIResultRecord> {
   const { repository, aiService } = deps;
   const startedAt = Date.now();
+  const correlationId = jobData.traceId;
 
   await repository.addEvent({
     visitId: jobData.visitId,
@@ -39,28 +43,71 @@ export async function analyzeVisit(
   try {
     const visit = await repository.getVisitForAnalysis(jobData.visitId);
     const primaryImage = selectPrimaryImage(visit);
-    const fraudSignals = await runContextualFraudChecks(visit, repository);
-    const analysis = await aiService.analyzeShelf({
+    logInfo("analyze visit started", {
+      correlationId,
       visitId: visit.id,
-      imagePath: primaryImage.localPath,
-      imageUrl: primaryImage.url,
-      saveOverlay: true,
-      useLlm: jobData.useLlm ?? config.defaultLlmEnabled,
-      outletName: visit.outlet.name,
-      repNotes: visit.notes,
+      outletId: visit.outletId,
+      jobId: job?.id,
+      stage: "analyze_visit",
+      status: "started",
     });
+    const fraudSignals = await observeStage("fraud", async () => runContextualFraudChecks(visit, repository));
+    for (const signal of fraudSignals) {
+      fraudSignalMetric.labels(signal.type, signal.severity).inc();
+    }
+    await repository.addEvent({
+      visitId: visit.id,
+      jobId: job?.id,
+      event: "FRAUD_CHECKS_COMPLETED",
+      level: fraudSignals.length > 0 ? "warn" : "info",
+      traceId: correlationId,
+      metadata: {
+        fraudSignalCount: fraudSignals.length,
+        signals: fraudSignals.map((signal) => ({
+          type: signal.type,
+          severity: signal.severity,
+          message: signal.message,
+        })),
+      },
+      createdAt: nowIso(),
+    });
+
+    const analysis = await aiService.analyzeShelf(
+      {
+        visitId: visit.id,
+        imagePath: primaryImage.localPath,
+        imageUrl: primaryImage.url,
+        saveOverlay: true,
+        useLlm: jobData.useLlm ?? config.defaultLlmEnabled,
+        outletName: visit.outlet.name,
+        repNotes: visit.notes,
+      },
+      { correlationId, jobId: job?.id, outletId: visit.outletId },
+    );
 
     const aiResult = toAIResult(visit, analysis);
     const highSeverityFraud = fraudSignals.some((signal) => signal.severity === "HIGH");
     const finalStatus = highSeverityFraud || analysis.compliance.status === "critical" ? "FLAGGED" : "COMPLETE";
     const outcomeSummary = buildOutcomeSummary(visit, analysis, fraudSignals, finalStatus);
-    const report = buildVisitReport(visit, analysis, fraudSignals);
+    const report = await observeStage("report", async () => buildVisitReport(visit, analysis, fraudSignals));
     aiResult.outcomeSummary = outcomeSummary;
 
     await repository.saveFraudSignals(fraudSignals);
     await repository.saveAIResult(aiResult);
     await repository.saveVisitReport(report);
     await repository.updateVisitStatus(visit.id, finalStatus);
+    await repository.addEvent({
+      visitId: visit.id,
+      jobId: job?.id,
+      event: "VISIT_REPORT_GENERATED",
+      level: "info",
+      traceId: correlationId,
+      metadata: {
+        complianceScore: analysis.compliance.score,
+        reportTitle: report.title,
+      },
+      createdAt: nowIso(),
+    });
 
     if (deps.enqueueVisitReport) {
       await deps.enqueueVisitReport(visit.id);
@@ -83,8 +130,34 @@ export async function analyzeVisit(
       createdAt: nowIso(),
     });
 
+    logInfo("analyze visit completed", {
+      correlationId,
+      visitId: visit.id,
+      outletId: visit.outletId,
+      jobId: job?.id,
+      stage: "analyze_visit",
+      status: finalStatus,
+      latencyMs: Date.now() - startedAt,
+      complianceScore: analysis.compliance.score,
+      fraudSignalCount: fraudSignals.length,
+    });
+
     return aiResult;
   } catch (error) {
+    logError(error, "analyze visit failed", {
+      correlationId,
+      visitId: jobData.visitId,
+      jobId: job?.id,
+      stage: "analyze_visit",
+      status: "error",
+      latencyMs: Date.now() - startedAt,
+    });
+    captureWorkerException(error, {
+      correlationId,
+      visitId: jobData.visitId,
+      jobId: job?.id,
+      stage: "analyze_visit",
+    });
     await repository.updateVisitStatus(jobData.visitId, "FAILED").catch(() => undefined);
     await repository.addEvent({
       visitId: jobData.visitId,
