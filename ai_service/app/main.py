@@ -10,7 +10,18 @@ from .compliance import build_supervisor_summary, evaluate_compliance
 from .image_io import download_image, ensure_image_path, save_upload
 from .llm_analysis import analyze_retail_image
 from .logging_utils import log_event, request_logging_middleware
-from .schemas import HealthResponse, ReadyResponse, ShelfAnalysisResponse, YoloDetectRequest, YoloResponse
+from .rag import RagConfigurationError, index_visit_report, query_assistant
+from .schemas import (
+    AssistantQueryRequest,
+    AssistantQueryResponse,
+    HealthResponse,
+    ReadyResponse,
+    ShelfAnalysisResponse,
+    VisitReportIndexRequest,
+    VisitReportIndexResponse,
+    YoloDetectRequest,
+    YoloResponse,
+)
 from .yolo_backend import RemoteYoloError, run_yolo_analysis
 from .yolo_detector import get_detector, model_loaded
 
@@ -30,7 +41,13 @@ app.add_middleware(
 )
 app.middleware("http")(request_logging_middleware)
 
-PROTECTED_AI_PATHS = {"/analyze-shelf", "/detect-yolo", "/detect-yolo/upload"}
+PROTECTED_AI_PATHS = {
+    "/analyze-shelf",
+    "/detect-yolo",
+    "/detect-yolo/upload",
+    "/rag/index-report",
+    "/assistant/query",
+}
 
 
 @app.middleware("http")
@@ -142,6 +159,21 @@ def analyze_shelf(payload: YoloDetectRequest) -> ShelfAnalysisResponse:
         supervisorSummary=build_supervisor_summary(yolo, compliance, llm),
         warnings=warnings,
     )
+
+
+@app.post("/rag/index-report", response_model=VisitReportIndexResponse)
+def rag_index_report(payload: VisitReportIndexRequest) -> VisitReportIndexResponse:
+    try:
+        return index_visit_report(payload)
+    except RagConfigurationError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+
+
+@app.post("/assistant/query", response_model=AssistantQueryResponse)
+def assistant_query(payload: AssistantQueryRequest) -> AssistantQueryResponse:
+    if not payload.question.strip():
+        raise HTTPException(status_code=400, detail="question is required")
+    return query_assistant(payload)
 
 
 def resolve_request_image(payload: YoloDetectRequest):

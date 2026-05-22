@@ -78,8 +78,15 @@ CORS_ORIGINS = [
 ]
 
 LLM_PROVIDER = os.getenv("RETAILOS_LLM_PROVIDER", "openai").lower()
-LLM_MODEL = os.getenv("RETAILOS_LLM_MODEL", "gpt-4o-mini")
+LLM_MODEL = os.getenv("RETAILOS_LLM_MODEL", "gpt-5.4-mini")
 LLM_ENABLED = _bool_from_env("RETAILOS_LLM_ENABLED", True)
+
+CHAT_MODEL = os.getenv("RETAILOS_CHAT_MODEL", LLM_MODEL)
+EMBEDDING_MODEL = os.getenv("RETAILOS_EMBEDDING_MODEL", "text-embedding-3-small")
+PINECONE_API_KEY = os.getenv("PINECONE_API_KEY", "").strip()
+PINECONE_INDEX = os.getenv("PINECONE_INDEX", os.getenv("PINECONE_INDEX_NAME", "")).strip()
+PINECONE_HOST = os.getenv("PINECONE_HOST", "").strip().rstrip("/")
+PINECONE_NAMESPACE = os.getenv("PINECONE_NAMESPACE", "retailos-visit-reports").strip()
 
 
 def readiness_errors() -> list[str]:

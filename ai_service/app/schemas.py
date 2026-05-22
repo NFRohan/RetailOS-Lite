@@ -154,3 +154,85 @@ class ReadyResponse(BaseModel):
 
     class Config:
         populate_by_name = True
+
+
+class VisitReportIndexRequest(BaseModel):
+    visit_id: str = Field(..., alias="visitId")
+    outlet_id: str = Field(..., alias="outletId")
+    title: str
+    summary: str
+    retrieval_text: str = Field(..., alias="retrievalText")
+    facts: dict = Field(default_factory=dict)
+    created_at: str | None = Field(default=None, alias="createdAt")
+
+    class Config:
+        populate_by_name = True
+
+
+class VisitReportIndexResponse(BaseModel):
+    status: str
+    vector_id: str = Field(..., alias="vectorId")
+    namespace: str
+    embedding_model: str = Field(..., alias="embeddingModel")
+
+    class Config:
+        populate_by_name = True
+
+
+class AssistantContextItem(BaseModel):
+    visit_id: str = Field(..., alias="visitId")
+    outlet_id: str | None = Field(default=None, alias="outletId")
+    outlet_name: str = Field(..., alias="outletName")
+    visit_date: str | None = Field(default=None, alias="visitDate")
+    compliance_score: int | None = Field(default=None, alias="complianceScore")
+    compliance_status: str | None = Field(default=None, alias="complianceStatus")
+    risk_status: str | None = Field(default=None, alias="riskStatus")
+    fraud_count: int = Field(default=0, alias="fraudCount")
+    missing_posm: bool | None = Field(default=None, alias="missingPosm")
+    summary: str
+    retrieval_text: str = Field(..., alias="retrievalText")
+
+    class Config:
+        populate_by_name = True
+
+
+class AssistantQueryRequest(BaseModel):
+    question: str
+    exact_context: list[AssistantContextItem] = Field(default_factory=list, alias="exactContext")
+    top_k: int = Field(default=5, alias="topK", ge=0, le=10)
+
+    class Config:
+        populate_by_name = True
+
+
+class AssistantCitation(BaseModel):
+    visit_id: str = Field(..., alias="visitId")
+    outlet_name: str = Field(..., alias="outletName")
+    reason: str
+
+    class Config:
+        populate_by_name = True
+
+
+class AssistantMatch(BaseModel):
+    visit_id: str = Field(..., alias="visitId")
+    outlet_id: str | None = Field(default=None, alias="outletId")
+    outlet_name: str = Field(..., alias="outletName")
+    score: float | None = None
+    summary: str
+
+    class Config:
+        populate_by_name = True
+
+
+class AssistantQueryResponse(BaseModel):
+    answer: str
+    citations: list[AssistantCitation]
+    matches: list[AssistantMatch]
+    model: str
+    embedding_model: str = Field(..., alias="embeddingModel")
+    retrieval_mode: str = Field(..., alias="retrievalMode")
+    warnings: list[str] = Field(default_factory=list)
+
+    class Config:
+        populate_by_name = True
