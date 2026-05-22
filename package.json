@@ -11,6 +11,7 @@
     "worker": "tsx worker/src/index.ts",
     "worker:enqueue-demo": "tsx worker/src/scripts/enqueueDemo.ts",
     "worker:dry-run": "tsx worker/src/scripts/dryRunAnalyzeVisit.ts",
+    "rag:index-reports": "tsx worker/src/scripts/indexVisitReports.ts",
     "check:worker": "tsc --noEmit -p tsconfig.worker.json",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
