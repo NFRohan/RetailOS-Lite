@@ -75,10 +75,14 @@ Relevant env vars:
 
 ```env
 AI_SERVICE_URL=http://127.0.0.1:8001
+RETAILOS_AI_SERVICE_API_KEY=
 REDIS_URL=redis://127.0.0.1:6379
 ANALYZE_VISIT_QUEUE=analyze_visit
+ANALYZE_VISIT_DLQ=analyze_visit_dlq
 EMBED_VISIT_REPORT_QUEUE=embed_visit_report
 WORKER_USE_LLM=true
 ```
+
+`RETAILOS_AI_SERVICE_API_KEY` is optional for local dev. When set on the FastAPI service, the worker sends it as `x-api-key` for `/analyze-shelf`.
 
 See [docs/BACKEND_HANDOFF.md](../docs/BACKEND_HANDOFF.md) for the Next.js integration contract and dashboard fields.

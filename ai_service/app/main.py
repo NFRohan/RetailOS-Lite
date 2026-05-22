@@ -1,5 +1,8 @@
-from fastapi import FastAPI, File, Form, HTTPException, Response, UploadFile
+import hmac
+
+from fastapi import FastAPI, File, Form, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import config
@@ -27,9 +30,29 @@ app.add_middleware(
 )
 app.middleware("http")(request_logging_middleware)
 
+PROTECTED_AI_PATHS = {"/analyze-shelf", "/detect-yolo", "/detect-yolo/upload"}
+
+
+@app.middleware("http")
+async def api_key_middleware(request: Request, call_next):
+    if should_require_api_key(request):
+        provided_key = request.headers.get("x-api-key", "")
+        if not hmac.compare_digest(provided_key, config.AI_SERVICE_API_KEY):
+            log_event("ai_service_auth_failed", path=request.url.path, method=request.method)
+            return JSONResponse({"detail": "Unauthorized"}, status_code=401)
+    return await call_next(request)
+
 config.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 config.OVERLAY_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/artifacts/overlays", StaticFiles(directory=str(config.OVERLAY_DIR)), name="overlays")
+
+
+def should_require_api_key(request: Request) -> bool:
+    return (
+        bool(config.AI_SERVICE_API_KEY)
+        and request.method != "OPTIONS"
+        and request.url.path in PROTECTED_AI_PATHS
+    )
 
 
 @app.get("/health", response_model=HealthResponse)

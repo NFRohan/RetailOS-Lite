@@ -70,6 +70,7 @@ YOLO_BACKEND = os.getenv("RETAILOS_YOLO_BACKEND", "local").lower()
 MODAL_YOLO_URL = os.getenv("RETAILOS_MODAL_YOLO_URL", "").strip()
 MODAL_YOLO_TOKEN = os.getenv("RETAILOS_MODAL_YOLO_TOKEN", "").strip()
 YOLO_FALLBACK_LOCAL = _bool_from_env("RETAILOS_YOLO_FALLBACK_LOCAL", True)
+AI_SERVICE_API_KEY = os.getenv("RETAILOS_AI_SERVICE_API_KEY", os.getenv("AI_SERVICE_API_KEY", "")).strip()
 CORS_ORIGINS = [
     origin.strip()
     for origin in os.getenv("RETAILOS_CORS_ORIGINS", "*").split(",")

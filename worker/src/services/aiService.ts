@@ -32,12 +32,15 @@ const analyzeShelfResponseSchema = z.object({
 });
 
 export class AIServiceClient {
-  constructor(private readonly baseUrl: string) {}
+  constructor(
+    private readonly baseUrl: string,
+    private readonly apiKey?: string,
+  ) {}
 
   async analyzeShelf(request: AnalyzeShelfRequest): Promise<AnalyzeShelfResponse> {
     const response = await fetch(`${this.baseUrl.replace(/\/$/, "")}/analyze-shelf`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: this.headers(),
       body: JSON.stringify(request),
     });
 
@@ -50,5 +53,11 @@ export class AIServiceClient {
     analyzeShelfResponseSchema.parse(json);
     return json as AnalyzeShelfResponse;
   }
-}
 
+  private headers(): Record<string, string> {
+    return {
+      "Content-Type": "application/json",
+      ...(this.apiKey ? { "x-api-key": this.apiKey } : {}),
+    };
+  }
+}

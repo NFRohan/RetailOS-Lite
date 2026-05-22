@@ -12,6 +12,14 @@ function env(name: string, fallback: string): string {
   return raw && raw.trim() ? raw : fallback;
 }
 
+function optionalEnv(...names: string[]): string | undefined {
+  for (const name of names) {
+    const raw = process.env[name];
+    if (raw && raw.trim()) return raw.trim();
+  }
+  return undefined;
+}
+
 function envNumber(name: string, fallback: number): number {
   const raw = process.env[name];
   if (!raw) return fallback;
@@ -22,8 +30,10 @@ function envNumber(name: string, fallback: number): number {
 export const config = {
   rootDir,
   aiServiceUrl: env("AI_SERVICE_URL", "http://127.0.0.1:8001"),
+  aiServiceApiKey: optionalEnv("RETAILOS_AI_SERVICE_API_KEY", "AI_SERVICE_API_KEY"),
   redisUrl: env("REDIS_URL", "redis://127.0.0.1:6379"),
   analyzeVisitQueueName: env("ANALYZE_VISIT_QUEUE", "analyze_visit"),
+  analyzeVisitDeadLetterQueueName: env("ANALYZE_VISIT_DLQ", "analyze_visit_dlq"),
   embedVisitReportQueueName: env("EMBED_VISIT_REPORT_QUEUE", "embed_visit_report"),
   workerConcurrency: envNumber("WORKER_CONCURRENCY", 2),
   localDbPath: env("WORKER_LOCAL_DB_PATH", path.join(rootDir, "worker", "data", "db.json")),

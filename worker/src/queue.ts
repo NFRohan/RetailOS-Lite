@@ -7,6 +7,16 @@ import { JsonVisitRepository } from "./repositories/jsonRepository.js";
 import { PrismaVisitRepository } from "./repositories/prismaRepository.js";
 import type { AnalyzeVisitJobData } from "./types/domain.js";
 
+type AnalyzeVisitDeadLetterJobData = {
+  failedAt: string;
+  originalJobId?: string;
+  originalJobName: string;
+  attemptsMade: number;
+  failedReason?: string;
+  stacktrace?: string[];
+  payload: AnalyzeVisitJobData;
+};
+
 async function createRepository() {
   if (config.usePrisma && process.env.DATABASE_URL) {
     const { PrismaClient } = await import("@prisma/client");
@@ -33,8 +43,11 @@ export type WorkerRuntime = {
 
 export function createAnalyzeVisitWorker(connection = createRedisConnection()) {
   validateWorkerConfig();
-  const aiService = new AIServiceClient(config.aiServiceUrl);
+  const aiService = new AIServiceClient(config.aiServiceUrl, config.aiServiceApiKey);
   const embedQueue = new Queue(config.embedVisitReportQueueName, { connection });
+  const deadLetterQueue = new Queue<AnalyzeVisitDeadLetterJobData>(config.analyzeVisitDeadLetterQueueName, {
+    connection,
+  });
 
   const worker = new Worker<AnalyzeVisitJobData>(
     config.analyzeVisitQueueName,
@@ -68,7 +81,12 @@ export function createAnalyzeVisitWorker(connection = createRedisConnection()) {
     },
   );
 
-  return { worker, embedQueue };
+  worker.on("failed", (job, error) => {
+    if (!job || !isFinalFailure(job)) return;
+    void addToDeadLetterQueue(deadLetterQueue, job, error);
+  });
+
+  return { worker, embedQueue, deadLetterQueue };
 }
 
 export function createAnalyzeVisitQueueEvents(connection = createRedisConnection()) {
@@ -79,15 +97,62 @@ export function createAnalyzeVisitRuntime(): WorkerRuntime {
   validateWorkerConfig();
   const workerConnection = createRedisConnection();
   const eventsConnection = createRedisConnection();
-  const { worker, embedQueue } = createAnalyzeVisitWorker(workerConnection);
+  const { worker, embedQueue, deadLetterQueue } = createAnalyzeVisitWorker(workerConnection);
   const events = createAnalyzeVisitQueueEvents(eventsConnection);
 
   return {
     worker,
     events,
     close: async () => {
-      await Promise.all([worker.close(), events.close(), embedQueue.close()]);
+      await Promise.all([worker.close(), events.close(), embedQueue.close(), deadLetterQueue.close()]);
       await Promise.all([workerConnection.quit(), eventsConnection.quit()]);
     },
   };
+}
+
+function isFinalFailure(job: { attemptsMade: number; opts: { attempts?: number } }): boolean {
+  const maxAttempts = job.opts.attempts ?? 1;
+  return job.attemptsMade >= maxAttempts;
+}
+
+async function addToDeadLetterQueue(
+  deadLetterQueue: Queue<AnalyzeVisitDeadLetterJobData>,
+  job: {
+    id?: string;
+    name: string;
+    attemptsMade: number;
+    failedReason?: string;
+    stacktrace?: string[] | null;
+    data: AnalyzeVisitJobData;
+  },
+  error: Error,
+): Promise<void> {
+  try {
+    await deadLetterQueue.add(
+      "analyze_visit_failed",
+      {
+        failedAt: new Date().toISOString(),
+        originalJobId: job.id,
+        originalJobName: job.name,
+        attemptsMade: job.attemptsMade,
+        failedReason: job.failedReason || error.message,
+        stacktrace: job.stacktrace ?? undefined,
+        payload: job.data,
+      },
+      {
+        jobId: `dlq-${job.id ?? job.data.visitId}-${Date.now()}`,
+        removeOnComplete: false,
+        removeOnFail: false,
+      },
+    );
+  } catch (dlqError) {
+    console.error(
+      JSON.stringify({
+        event: "dead_letter_enqueue_failed",
+        jobId: job.id,
+        visitId: job.data.visitId,
+        error: dlqError instanceof Error ? dlqError.message : String(dlqError),
+      }),
+    );
+  }
 }
