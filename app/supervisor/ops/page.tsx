@@ -124,10 +124,10 @@ export default function SupervisorOpsPage() {
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <Badge variant="outline">{timeline.visitStatus}</Badge>
+                      <VisitStatusBadge status={timeline.visitStatus} />
                       <Badge variant="secondary">{timeline.complianceScore ?? "N/A"}% compliance</Badge>
-                      <Badge variant={timeline.fraudSignals > 0 ? "warning" : "success"}>{timeline.fraudSignals} fraud</Badge>
-                      {timeline.durationMs !== null && <Badge variant="outline">{formatMs(timeline.durationMs)}</Badge>}
+                      <Badge variant={timeline.fraudSignals > 0 ? "warning" : "success"}>{fraudSignalLabel(timeline.fraudSignals)}</Badge>
+                      {timeline.durationMs !== null && <DurationPill value={timeline.durationMs} />}
                     </div>
                   </div>
                   <div className="mt-4 space-y-3">
@@ -139,7 +139,7 @@ export default function SupervisorOpsPage() {
                           <p className="font-medium text-navy">{humanize(event.event)}</p>
                           <p className="truncate text-xs text-muted-foreground">{event.traceId ?? event.jobId ?? "no correlation id"}</p>
                         </div>
-                        {event.latencyMs !== null && <span className="rounded-full bg-[#eef2fb] px-2 py-1 text-xs font-semibold text-navy">{formatMs(event.latencyMs)}</span>}
+                        {event.latencyMs !== null && <DurationPill value={event.latencyMs} />}
                       </div>
                     ))}
                   </div>
@@ -220,6 +220,24 @@ function queueLabel(queue: OpsData["queueHealth"]["queues"][number] | undefined)
 function StageBadge({ stage, level }: { stage: string; level: string }) {
   const variant = level === "error" ? "critical" : level === "warn" ? "warning" : "secondary";
   return <Badge variant={variant}>{stage}</Badge>;
+}
+
+function VisitStatusBadge({ status }: { status: string }) {
+  const normalized = status.toUpperCase();
+  const variant = normalized === "FAILED" ? "critical" : normalized === "FLAGGED" ? "warning" : normalized === "COMPLETE" ? "success" : "secondary";
+  return <Badge variant={variant}>{humanize(status)}</Badge>;
+}
+
+function DurationPill({ value }: { value: number }) {
+  return (
+    <span className="inline-flex h-7 min-w-[64px] items-center justify-center rounded-full bg-[#eef2fb] px-2.5 text-xs font-semibold tabular-nums text-navy">
+      {formatMs(value)}
+    </span>
+  );
+}
+
+function fraudSignalLabel(count: number) {
+  return `${count} fraud signal${count === 1 ? "" : "s"}`;
 }
 
 function EmptyState({ text }: { text: string }) {
