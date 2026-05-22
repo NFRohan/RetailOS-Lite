@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { signOut } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { Bot, ClipboardList, LayoutDashboard, LogOut, Settings, Store } from "lucide-react";
+import { Bot, ClipboardList, LayoutDashboard, LogOut, RadioTower, Settings, Store } from "lucide-react";
 
 const navItems = [
   { href: "/supervisor", label: "Overview", icon: LayoutDashboard },
   { href: "/supervisor/visits", label: "Visit Logs", icon: ClipboardList },
   { href: "/supervisor/outlets", label: "Outlet Verification", icon: Store },
   { href: "/supervisor/insights", label: "AI Insights", icon: Bot },
+  { href: "/supervisor/ops", label: "Ops Control", icon: RadioTower },
   { href: "/supervisor#settings", label: "Settings", icon: Settings },
 ];
 
