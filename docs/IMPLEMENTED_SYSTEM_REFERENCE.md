@@ -77,6 +77,7 @@ RETAILOS_LLM_PROVIDER=openai
 RETAILOS_LLM_MODEL=gpt-5.4-mini
 RETAILOS_CHAT_MODEL=gpt-5.4-mini
 RETAILOS_EMBEDDING_MODEL=text-embedding-3-small
+RETAILOS_EMBEDDING_DIMENSIONS=512
 RETAILOS_CORS_ORIGINS=*
 OPENAI_API_KEY=
 PINECONE_API_KEY=
@@ -674,6 +675,7 @@ What exists now:
 - `embed_visit_report` job is enqueued after analysis.
 - The worker consumes `embed_visit_report` and calls `POST /rag/index-report`.
 - The AI service embeds with `text-embedding-3-small` and upserts to Pinecone.
+- If Pinecone uses a 512-dimensional index, set `RETAILOS_EMBEDDING_DIMENSIONS=512`; the service can also retry once after a dimension mismatch.
 - `POST /api/assistant/query` adds exact Prisma context, then asks the AI service for a GPT answer.
 
 What remains:

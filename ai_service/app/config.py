@@ -83,6 +83,7 @@ LLM_ENABLED = _bool_from_env("RETAILOS_LLM_ENABLED", True)
 
 CHAT_MODEL = os.getenv("RETAILOS_CHAT_MODEL", LLM_MODEL)
 EMBEDDING_MODEL = os.getenv("RETAILOS_EMBEDDING_MODEL", "text-embedding-3-small")
+EMBEDDING_DIMENSIONS = _int_from_env("RETAILOS_EMBEDDING_DIMENSIONS", 0)
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY", "").strip()
 PINECONE_INDEX = os.getenv("PINECONE_INDEX", os.getenv("PINECONE_INDEX_NAME", "")).strip()
 PINECONE_HOST = os.getenv("PINECONE_HOST", "").strip().rstrip("/")

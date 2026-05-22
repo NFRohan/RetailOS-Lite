@@ -119,6 +119,7 @@ Set OpenAI and Pinecone env vars in `ai_service/.env`:
 ```powershell
 $env:RETAILOS_CHAT_MODEL='gpt-5.4-mini'
 $env:RETAILOS_EMBEDDING_MODEL='text-embedding-3-small'
+$env:RETAILOS_EMBEDDING_DIMENSIONS='512'
 $env:PINECONE_API_KEY='...'
 $env:PINECONE_INDEX='retailos'
 $env:PINECONE_HOST='https://your-index-host.svc...pinecone.io'
@@ -145,6 +146,8 @@ Invoke-RestMethod `
 ```
 
 Ask a question through Next.js `POST /api/assistant/query`; the Next route adds exact Postgres context before proxying to the AI service.
+
+If your Pinecone index was created with a non-default dimension, set `RETAILOS_EMBEDDING_DIMENSIONS` to match it. The service also retries once when Pinecone reports a dimension mismatch.
 
 ## Readiness
 

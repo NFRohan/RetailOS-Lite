@@ -1,4 +1,5 @@
 import json
+import re
 from urllib import error, request
 
 from . import config
@@ -41,6 +42,16 @@ class RagConfigurationError(RuntimeError):
     pass
 
 
+class PineconeRequestError(RuntimeError):
+    def __init__(self, status_code: int, detail: str):
+        super().__init__(f"Pinecone request failed ({status_code}): {detail}")
+        self.status_code = status_code
+        self.detail = detail
+
+
+_detected_embedding_dimensions: int | None = None
+
+
 def rag_is_configured() -> bool:
     return bool(config.PINECONE_API_KEY and config.PINECONE_HOST and config.PINECONE_INDEX)
 
@@ -68,19 +79,25 @@ def index_visit_report(payload: VisitReportIndexRequest) -> VisitReportIndexResp
         "source": "visit_report",
     }
 
-    pinecone_post(
-        "/vectors/upsert",
-        {
-            "vectors": [
-                {
-                    "id": vector_id,
-                    "values": values,
-                    "metadata": metadata,
-                }
-            ],
-            "namespace": config.PINECONE_NAMESPACE,
-        },
-    )
+    upsert_payload = {
+        "vectors": [
+            {
+                "id": vector_id,
+                "values": values,
+                "metadata": metadata,
+            }
+        ],
+        "namespace": config.PINECONE_NAMESPACE,
+    }
+    try:
+        pinecone_post("/vectors/upsert", upsert_payload)
+    except PineconeRequestError as error:
+        dimensions = dimension_from_pinecone_error(error)
+        if not dimensions:
+            raise
+        values = embed_text(payload.retrieval_text, dimensions=dimensions)
+        upsert_payload["vectors"][0]["values"] = values
+        pinecone_post("/vectors/upsert", upsert_payload)
 
     log_event(
         "visit_report_indexed",
@@ -127,15 +144,20 @@ def query_assistant(payload: AssistantQueryRequest) -> AssistantQueryResponse:
 def search_visit_reports(question: str, top_k: int) -> list[AssistantMatch]:
     ensure_rag_configured()
     values = embed_text(question)
-    response = pinecone_post(
-        "/query",
-        {
-            "vector": values,
-            "topK": top_k,
-            "includeMetadata": True,
-            "namespace": config.PINECONE_NAMESPACE,
-        },
-    )
+    query_payload = {
+        "vector": values,
+        "topK": top_k,
+        "includeMetadata": True,
+        "namespace": config.PINECONE_NAMESPACE,
+    }
+    try:
+        response = pinecone_post("/query", query_payload)
+    except PineconeRequestError as error:
+        dimensions = dimension_from_pinecone_error(error)
+        if not dimensions:
+            raise
+        query_payload["vector"] = embed_text(question, dimensions=dimensions)
+        response = pinecone_post("/query", query_payload)
     matches = response.get("matches", [])
     normalized: list[AssistantMatch] = []
     for match in matches:
@@ -257,7 +279,7 @@ def fallback_answer(
     )
 
 
-def embed_text(text: str) -> list[float]:
+def embed_text(text: str, dimensions: int | None = None) -> list[float]:
     if not openai_is_configured():
         raise RagConfigurationError("OPENAI_API_KEY is required for embeddings.")
     try:
@@ -266,7 +288,11 @@ def embed_text(text: str) -> list[float]:
         raise RagConfigurationError("openai package is required for embeddings.") from error
 
     client = OpenAI()
-    response = client.embeddings.create(model=config.EMBEDDING_MODEL, input=text)
+    requested_dimensions = dimensions or active_embedding_dimensions()
+    kwargs = {"model": config.EMBEDDING_MODEL, "input": text}
+    if requested_dimensions:
+        kwargs["dimensions"] = requested_dimensions
+    response = client.embeddings.create(**kwargs)
     return response.data[0].embedding
 
 
@@ -289,7 +315,7 @@ def pinecone_post(path: str, payload: dict) -> dict:
             return json.loads(raw) if raw else {}
     except error.HTTPError as http_error:
         detail = http_error.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"Pinecone request failed ({http_error.code}): {detail}") from http_error
+        raise PineconeRequestError(http_error.code, detail) from http_error
 
 
 def ensure_rag_configured() -> None:
@@ -304,6 +330,27 @@ def parse_json_output(text: str) -> dict:
         if cleaned.lower().startswith("json"):
             cleaned = cleaned[4:].strip()
     return json.loads(cleaned)
+
+
+def active_embedding_dimensions() -> int | None:
+    if config.EMBEDDING_DIMENSIONS > 0:
+        return config.EMBEDDING_DIMENSIONS
+    return _detected_embedding_dimensions
+
+
+def dimension_from_pinecone_error(error: PineconeRequestError) -> int | None:
+    global _detected_embedding_dimensions
+    match = re.search(r"index\s+(\d+)", error.detail)
+    if not match:
+        return None
+    dimensions = int(match.group(1))
+    _detected_embedding_dimensions = dimensions
+    log_event(
+        "pinecone_embedding_dimension_detected",
+        dimensions=dimensions,
+        embeddingModel=config.EMBEDDING_MODEL,
+    )
+    return dimensions
 
 
 def vector_id_for_visit(visit_id: str) -> str:
