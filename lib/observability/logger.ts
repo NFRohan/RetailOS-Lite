@@ -1,4 +1,6 @@
 import pino from "pino";
+import fs from "node:fs";
+import path from "node:path";
 
 export type TelemetryFields = {
   correlationId?: string;
@@ -11,15 +13,26 @@ export type TelemetryFields = {
   [key: string]: unknown;
 };
 
-const logger = pino({
+const service = process.env.OTEL_SERVICE_NAME || "web";
+const streams: pino.StreamEntry[] = [{ stream: process.stdout }];
+if (process.env.LOG_TO_FILE === "true") {
+  const logDir = path.join(process.cwd(), process.env.LOG_DIR || "logs");
+  fs.mkdirSync(logDir, { recursive: true });
+  streams.push({ stream: pino.destination({ dest: path.join(logDir, `${service}.log`), sync: false }) });
+}
+
+const logger = pino(
+  {
   level: process.env.LOG_LEVEL || "info",
   base: {
-    service: process.env.OTEL_SERVICE_NAME || "web",
+    service,
     environment: process.env.APP_ENV || process.env.NODE_ENV || "development",
   },
   timestamp: pino.stdTimeFunctions.isoTime,
   messageKey: "message",
-});
+  },
+  pino.multistream(streams),
+);
 
 export function logInfo(message: string, fields: TelemetryFields = {}) {
   logger.info(cleanFields(fields), message);

@@ -10,6 +10,13 @@ from fastapi import Request
 logger = logging.getLogger("retailos.ai_service")
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
+if os.getenv("LOG_TO_FILE", "").lower() == "true":
+    log_dir = os.getenv("LOG_DIR", "logs")
+    os.makedirs(log_dir, exist_ok=True)
+    file_handler = logging.FileHandler(os.path.join(log_dir, "ai-service.log"), encoding="utf-8")
+    file_handler.setFormatter(logging.Formatter("%(message)s"))
+    logger.addHandler(file_handler)
+
 
 def log_event(event: str, **fields):
     logger.info(

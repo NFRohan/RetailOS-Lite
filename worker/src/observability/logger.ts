@@ -1,4 +1,6 @@
 import pino from "pino";
+import fs from "node:fs";
+import path from "node:path";
 import { config } from "../config.js";
 
 export type WorkerTelemetryFields = {
@@ -12,7 +14,15 @@ export type WorkerTelemetryFields = {
   [key: string]: unknown;
 };
 
-export const logger = pino({
+const streams: pino.StreamEntry[] = [{ stream: process.stdout }];
+if (process.env.LOG_TO_FILE === "true") {
+  const logDir = path.join(config.rootDir, process.env.LOG_DIR || "logs");
+  fs.mkdirSync(logDir, { recursive: true });
+  streams.push({ stream: pino.destination({ dest: path.join(logDir, "worker.log"), sync: false }) });
+}
+
+export const logger = pino(
+  {
   level: process.env.LOG_LEVEL || "info",
   base: {
     service: "worker",
@@ -20,7 +30,9 @@ export const logger = pino({
   },
   timestamp: pino.stdTimeFunctions.isoTime,
   messageKey: "message",
-});
+  },
+  pino.multistream(streams),
+);
 
 export function logInfo(message: string, fields: WorkerTelemetryFields = {}) {
   logger.info(clean(fields), message);
