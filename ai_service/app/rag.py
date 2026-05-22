@@ -4,6 +4,7 @@ from urllib import error, request
 
 from . import config
 from .logging_utils import log_event
+from .observability import assistant_latency, capture_exception, observe_latency, openai_latency, pinecone_latency
 from .schemas import (
     AssistantCitation,
     AssistantContextItem,
@@ -118,27 +119,37 @@ def index_visit_report(payload: VisitReportIndexRequest) -> VisitReportIndexResp
 def query_assistant(payload: AssistantQueryRequest) -> AssistantQueryResponse:
     warnings: list[str] = []
     vector_matches: list[AssistantMatch] = []
+    started_context_count = len(payload.exact_context)
 
-    if payload.top_k > 0 and rag_is_configured() and openai_is_configured():
-        try:
-            vector_matches = search_visit_reports(payload.question, payload.top_k)
-        except Exception as error:
-            warnings.append("Vector retrieval failed; answered from exact database context only.")
-            log_event("rag_vector_search_failed", error=str(error))
-    elif payload.top_k > 0:
-        warnings.append("Vector retrieval is not configured; answered from exact database context only.")
+    with observe_latency(
+        assistant_latency,
+        ("pending",),
+        "assistant_query_completed",
+        stage="assistant",
+        exactContextCount=started_context_count,
+        topK=payload.top_k,
+    ):
+        if payload.top_k > 0 and rag_is_configured() and openai_is_configured():
+            try:
+                vector_matches = search_visit_reports(payload.question, payload.top_k)
+            except Exception as error:
+                warnings.append("Vector retrieval failed; answered from exact database context only.")
+                capture_exception(error, stage="assistant", model=config.EMBEDDING_MODEL, inference_type="vector_search")
+                log_event("rag_vector_search_failed", stage="assistant", status="error", error=str(error))
+        elif payload.top_k > 0:
+            warnings.append("Vector retrieval is not configured; answered from exact database context only.")
 
-    answer, citations = generate_answer(payload.question, payload.exact_context, vector_matches)
-    mode = retrieval_mode(payload.exact_context, vector_matches)
-    return AssistantQueryResponse(
-        answer=answer,
-        citations=citations,
-        matches=vector_matches,
-        model=config.CHAT_MODEL,
-        embeddingModel=config.EMBEDDING_MODEL,
-        retrievalMode=mode,
-        warnings=warnings,
-    )
+        answer, citations = generate_answer(payload.question, payload.exact_context, vector_matches)
+        mode = retrieval_mode(payload.exact_context, vector_matches)
+        return AssistantQueryResponse(
+            answer=answer,
+            citations=citations,
+            matches=vector_matches,
+            model=config.CHAT_MODEL,
+            embeddingModel=config.EMBEDDING_MODEL,
+            retrievalMode=mode,
+            warnings=warnings,
+        )
 
 
 def search_visit_reports(question: str, top_k: int) -> list[AssistantMatch]:
@@ -211,21 +222,28 @@ Keep the answer operational and under 180 words.
     )
 
     try:
-        response = client.responses.create(
+        with observe_latency(
+            openai_latency,
+            ("assistant", config.CHAT_MODEL),
+            "openai_assistant_completed",
+            stage="assistant",
             model=config.CHAT_MODEL,
-            input=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            text={
-                "format": {
-                    "type": "json_schema",
-                    "name": "retailos_assistant_answer",
-                    "strict": True,
-                    "schema": ANSWER_SCHEMA,
-                }
-            },
-        )
+        ):
+            response = client.responses.create(
+                model=config.CHAT_MODEL,
+                input=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                text={
+                    "format": {
+                        "type": "json_schema",
+                        "name": "retailos_assistant_answer",
+                        "strict": True,
+                        "schema": ANSWER_SCHEMA,
+                    }
+                },
+            )
         parsed = parse_json_output(response.output_text)
         citations = [
             AssistantCitation(
@@ -237,6 +255,7 @@ Keep the answer operational and under 180 words.
         ]
         return parsed["answer"], citations
     except Exception as error:
+        capture_exception(error, stage="assistant", model=config.CHAT_MODEL, inference_type="rag_generation")
         log_event("assistant_generation_failed", model=config.CHAT_MODEL, error=str(error))
         return fallback_answer(question, exact_context, vector_matches)
 
@@ -292,7 +311,15 @@ def embed_text(text: str, dimensions: int | None = None) -> list[float]:
     kwargs = {"model": config.EMBEDDING_MODEL, "input": text}
     if requested_dimensions:
         kwargs["dimensions"] = requested_dimensions
-    response = client.embeddings.create(**kwargs)
+    with observe_latency(
+        openai_latency,
+        ("embedding", config.EMBEDDING_MODEL),
+        "openai_embedding_completed",
+        stage="embedding",
+        model=config.EMBEDDING_MODEL,
+        dimensions=requested_dimensions,
+    ):
+        response = client.embeddings.create(**kwargs)
     return response.data[0].embedding
 
 
@@ -310,12 +337,21 @@ def pinecone_post(path: str, payload: dict) -> dict:
         },
     )
     try:
-        with request.urlopen(req, timeout=20) as response:
-            raw = response.read().decode("utf-8")
-            return json.loads(raw) if raw else {}
+        with observe_latency(
+            pinecone_latency,
+            (path.strip("/") or "root",),
+            "pinecone_request_completed",
+            stage="embedding" if "upsert" in path else "assistant",
+            path=path,
+        ):
+            with request.urlopen(req, timeout=20) as response:
+                raw = response.read().decode("utf-8")
+                return json.loads(raw) if raw else {}
     except error.HTTPError as http_error:
         detail = http_error.read().decode("utf-8", errors="replace")
-        raise PineconeRequestError(http_error.code, detail) from http_error
+        pinecone_error = PineconeRequestError(http_error.code, detail)
+        capture_exception(pinecone_error, stage="embedding" if "upsert" in path else "assistant", model=config.EMBEDDING_MODEL)
+        raise pinecone_error from http_error
 
 
 def ensure_rag_configured() -> None:
