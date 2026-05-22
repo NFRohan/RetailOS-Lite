@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const aiServiceUrl = trimTrailingSlash(process.env.AI_SERVICE_URL || "http://127.0.0.1:8001");
 const remotePatterns: NonNullable<NonNullable<NextConfig["images"]>["remotePatterns"]> = [
@@ -26,7 +27,13 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  silent: true,
+  disableLogger: true,
+});
 
 function addRemotePattern(rawUrl: string | undefined): void {
   if (!rawUrl) return;

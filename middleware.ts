@@ -1,6 +1,7 @@
 import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { CORRELATION_HEADER, REQUEST_ID_HEADER, createCorrelationId } from "@/lib/observability/correlation";
 
 type SessionRole = "REP" | "SUPERVISOR" | "ADMIN";
 
@@ -12,7 +13,12 @@ export async function middleware(request: NextRequest) {
   const isSupervisorRoute = pathname.startsWith("/supervisor");
   const isProtected = isRepRoute || isSupervisorRoute;
 
-  if (!isProtected) return NextResponse.next();
+  const correlationId =
+    request.headers.get(CORRELATION_HEADER) ||
+    request.headers.get(REQUEST_ID_HEADER) ||
+    createCorrelationId("web");
+
+  if (!isProtected) return nextWithCorrelation(request, correlationId);
 
   if (!token) {
     const loginUrl = new URL("/login", request.url);
@@ -30,7 +36,17 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/rep/visits", request.url));
   }
 
-  return NextResponse.next();
+  return nextWithCorrelation(request, correlationId);
+}
+
+function nextWithCorrelation(request: NextRequest, correlationId: string) {
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set(CORRELATION_HEADER, correlationId);
+  requestHeaders.set(REQUEST_ID_HEADER, correlationId);
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  response.headers.set(CORRELATION_HEADER, correlationId);
+  response.headers.set(REQUEST_ID_HEADER, correlationId);
+  return response;
 }
 
 export const config = {
