@@ -10,9 +10,10 @@ import type { DashboardData } from "@/lib/types";
 import { AlertTriangle, ClipboardCheck, MapPin, PackageX, ShieldCheck, TrendingUp } from "lucide-react";
 
 export default function SupervisorDashboardPage() {
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
   const { data, isLoading } = useQuery<DashboardData>({
-    queryKey: ["dashboard", "7d"],
-    queryFn: () => fetch("/api/dashboard?range=7d").then((r) => r.json()),
+    queryKey: ["dashboard", "7d", timeZone],
+    queryFn: () => fetch(`/api/dashboard?range=7d&tz=${encodeURIComponent(timeZone)}`).then((r) => r.json()),
     refetchInterval: 5000,
   });
 
@@ -46,7 +47,7 @@ export default function SupervisorDashboardPage() {
           icon={MapPin}
           label="Total Visits Today"
           value={summary?.visitsToday ?? data?.visitsToday ?? 0}
-          delta={formatDelta(summary?.visitsDeltaPct)}
+          helper={summary?.timeZone ? `Business day in ${summary.timeZone}` : "Local business day"}
         />
         <MetricCard
           delay={0.04}
@@ -75,7 +76,7 @@ export default function SupervisorDashboardPage() {
           intent="critical"
         />
         <PosmComplianceCard percentage={summary?.posmCompliancePct ?? 0} delta={summary?.posmComplianceDeltaPct ?? 0} />
-        <PerformanceTrendCard score={summary?.qualityScore ?? 0} delta={summary?.qualityDeltaPct ?? 0} trend={trend} />
+        <PerformanceTrendCard score={summary?.qualityScore ?? 0} trend={trend} />
       </section>
 
       <Card className="overflow-hidden border-[#d6ddea] bg-white shadow-[0_1px_3px_rgba(2,43,58,0.05)]">
@@ -186,11 +187,9 @@ function PosmComplianceCard({ percentage, delta }: { percentage: number; delta: 
 
 function PerformanceTrendCard({
   score,
-  delta,
   trend,
 }: {
   score: number;
-  delta: number;
   trend: DashboardData["trend"];
 }) {
   const maxScore = Math.max(100, ...trend.map((point) => point.qualityScore));
@@ -200,14 +199,14 @@ function PerformanceTrendCard({
       <CardHeader className="flex flex-row items-start justify-between pb-2">
         <div className="flex items-center gap-2 text-muted-foreground">
           <TrendingUp className="h-5 w-5" />
-          <CardTitle className="text-xs font-semibold uppercase tracking-wide">Performance Trend</CardTitle>
+          <CardTitle className="text-xs font-semibold uppercase tracking-wide">Visit Quality</CardTitle>
         </div>
-        <span className="rounded-full bg-teal/10 px-2 py-0.5 text-xs font-semibold text-teal">{formatDelta(delta)}</span>
+        <span className="text-xs font-semibold text-muted-foreground">Clean visits / total visits</span>
       </CardHeader>
       <CardContent>
         <div className="flex items-end gap-6">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Quality</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">No-fraud rate</p>
             <p className="text-4xl font-bold text-navy">{score}%</p>
           </div>
           <div className="flex h-14 flex-1 items-end gap-1">

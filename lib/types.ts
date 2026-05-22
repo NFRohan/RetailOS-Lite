@@ -72,6 +72,7 @@ export type DashboardData = {
 
 export type DashboardSummary = {
   rangeDays: number;
+  timeZone: string;
   visitsToday: number;
   visitsDeltaPct: number;
   avgComplianceScore: number;

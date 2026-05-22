@@ -42,10 +42,10 @@ export default function SupervisorLayout({ children }: { children: React.ReactNo
               </Link>
             ))}
           </nav>
-          <div className="mt-auto rounded-2xl border border-[#d7ddeb] bg-white/70 p-3">
+          <div className="mt-auto rounded-2xl border border-[#d7ddeb] bg-white/70 p-3 text-center">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal">Signed in</p>
             <p className="mt-1 text-sm font-semibold text-navy">Supervisor</p>
-            <SupervisorLogoutButton className="mt-3 w-full justify-start text-navy/70 hover:text-navy" />
+            <SupervisorLogoutButton className="mt-3 w-full justify-center text-navy/70 hover:text-navy" />
           </div>
         </aside>
         <div className="flex flex-1 flex-col">

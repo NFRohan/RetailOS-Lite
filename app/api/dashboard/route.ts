@@ -33,14 +33,16 @@ export async function GET(request: NextRequest) {
   }
 
   const rangeDays = rangeDaysFrom(request.nextUrl.searchParams.get("range"));
-  const todayStart = startOfUtcDay(new Date());
-  const tomorrowStart = addDays(todayStart, 1);
-  const currentStart = addDays(tomorrowStart, -rangeDays);
-  const previousStart = addDays(currentStart, -rangeDays);
+  const timeZone = timeZoneFrom(request.nextUrl.searchParams.get("tz"));
+  const todayKey = dateKeyInTimeZone(new Date(), timeZone);
+  const tomorrowKey = addDaysToDateKey(todayKey, 1);
+  const yesterdayKey = addDaysToDateKey(todayKey, -1);
+  const currentStartKey = addDaysToDateKey(tomorrowKey, -rangeDays);
+  const previousStartKey = addDaysToDateKey(currentStartKey, -rangeDays);
 
   const [trend, previousTrend] = await Promise.all([
-    dailyAggregates(currentStart, tomorrowStart),
-    dailyAggregates(previousStart, currentStart),
+    dailyAggregates(currentStartKey, tomorrowKey, timeZone),
+    dailyAggregates(previousStartKey, currentStartKey, timeZone),
   ]);
 
   const visits = await prisma.visit.findMany({
@@ -67,13 +69,14 @@ export async function GET(request: NextRequest) {
     .slice(0, 5);
   const currentSummary = summarizeTrend(trend);
   const previousSummary = summarizeTrend(previousTrend);
-  const today = trend.find((point) => point.date === dateKey(todayStart));
-  const yesterday = trend.find((point) => point.date === dateKey(addDays(todayStart, -1)));
+  const today = trend.find((point) => point.date === todayKey);
+  const yesterday = trend.find((point) => point.date === yesterdayKey);
   const visitsToday = today?.visits ?? 0;
   const visitsYesterday = yesterday?.visits ?? 0;
 
   const summary = {
     rangeDays,
+    timeZone,
     visitsToday,
     visitsDeltaPct: percentChange(visitsToday, visitsYesterday),
     avgComplianceScore: currentSummary.avgComplianceScore,
@@ -109,14 +112,18 @@ export async function GET(request: NextRequest) {
   });
 }
 
-async function dailyAggregates(start: Date, endExclusive: Date): Promise<NormalizedDailyAggregate[]> {
+async function dailyAggregates(
+  startDate: string,
+  endExclusiveDate: string,
+  timeZone: string,
+): Promise<NormalizedDailyAggregate[]> {
   const rows = await prisma.$queryRaw<DailyAggregateRow[]>`
     WITH days AS (
-      SELECT generate_series(${start}::date, (${endExclusive}::date - interval '1 day'), interval '1 day')::date AS day
+      SELECT generate_series(${startDate}::date, (${endExclusiveDate}::date - interval '1 day'), interval '1 day')::date AS day
     ),
     visit_daily AS (
       SELECT
-        date_trunc('day', v."createdAt")::date AS day,
+        ((v."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${timeZone})::date AS day,
         count(*)::int AS visits,
         round(avg(ar."complianceScore"))::int AS "avgComplianceScore",
         count(*) FILTER (WHERE ar."complianceScore" IS NOT NULL)::int AS "scoredVisits",
@@ -124,16 +131,18 @@ async function dailyAggregates(start: Date, endExclusive: Date): Promise<Normali
         count(*) FILTER (WHERE ar."posm"->>'detected' = 'false')::int AS "posmMissing"
       FROM "Visit" v
       LEFT JOIN "AIResult" ar ON ar."visitId" = v.id
-      WHERE v."createdAt" >= ${start} AND v."createdAt" < ${endExclusive}
+      WHERE ((v."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${timeZone})::date >= ${startDate}::date
+        AND ((v."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${timeZone})::date < ${endExclusiveDate}::date
       GROUP BY day
     ),
     fraud_daily AS (
       SELECT
-        date_trunc('day', v."createdAt")::date AS day,
+        ((v."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${timeZone})::date AS day,
         count(f.id)::int AS "fraudDetections"
       FROM "Visit" v
       JOIN "FraudSignal" f ON f."visitId" = v.id
-      WHERE v."createdAt" >= ${start} AND v."createdAt" < ${endExclusive}
+      WHERE ((v."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${timeZone})::date >= ${startDate}::date
+        AND ((v."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${timeZone})::date < ${endExclusiveDate}::date
       GROUP BY day
     )
     SELECT
@@ -201,6 +210,16 @@ function rangeDaysFrom(raw: string | null): number {
   return Math.min(90, Math.max(1, Math.trunc(days)));
 }
 
+function timeZoneFrom(raw: string | null): string {
+  const candidate = raw?.trim() || process.env.DASHBOARD_TIME_ZONE || "UTC";
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: candidate }).format(new Date());
+    return candidate;
+  } catch {
+    return "UTC";
+  }
+}
+
 function percentChange(current: number, previous: number): number {
   if (previous === 0) return current > 0 ? 100 : 0;
   return Math.round(((current - previous) / previous) * 100);
@@ -211,20 +230,26 @@ function toNumber(value: number | bigint | null): number {
   return Number(value);
 }
 
-function startOfUtcDay(date: Date): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+function dateKeyInTimeZone(date: Date, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const year = parts.find((part) => part.type === "year")?.value ?? "1970";
+  const month = parts.find((part) => part.type === "month")?.value ?? "01";
+  const day = parts.find((part) => part.type === "day")?.value ?? "01";
+  return `${year}-${month}-${day}`;
 }
 
-function addDays(date: Date, days: number): Date {
-  const next = new Date(date);
+function addDaysToDateKey(dateKey: string, days: number): string {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const next = new Date(Date.UTC(year, month - 1, day));
   next.setUTCDate(next.getUTCDate() + days);
-  return next;
-}
-
-function dateKey(date: Date): string {
-  return date.toISOString().slice(0, 10);
+  return next.toISOString().slice(0, 10);
 }
 
 function normalizeDateKey(value: string | Date): string {
-  return value instanceof Date ? dateKey(value) : value.slice(0, 10);
+  return value instanceof Date ? value.toISOString().slice(0, 10) : value.slice(0, 10);
 }
