@@ -5,6 +5,7 @@ import { buildAssistantExactContext, fallbackAssistantAnswer, type AssistantAnsw
 import { correlationIdFromHeaders } from "@/lib/observability/correlation";
 import { logError, logInfo, logWarn } from "@/lib/observability/logger";
 import { metrics } from "@/lib/observability/metrics";
+import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
@@ -44,12 +45,24 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       const detail = await response.text();
+      const latencyMs = Date.now() - started;
       logWarn("assistant service returned fallback", {
         correlationId,
         stage: "assistant",
         status: String(response.status),
-        latencyMs: Date.now() - started,
+        latencyMs,
         exactContextCount: exactContext.length,
+      });
+      await recordAssistantEvent({
+        event: "ASSISTANT_QUERY_FALLBACK",
+        level: "warn",
+        traceId: correlationId,
+        userId: session.user.id,
+        question,
+        latencyMs,
+        exactContextCount: exactContext.length,
+        status: `service_${response.status}`,
+        error: detail.slice(0, 500),
       });
       return NextResponse.json(
         fallbackAssistantAnswer(question, exactContext, [`AI assistant service failed (${response.status}): ${detail}`]),
@@ -57,15 +70,28 @@ export async function POST(request: NextRequest) {
     }
 
     const answer = (await response.json()) as AssistantAnswer;
+    const latencyMs = Date.now() - started;
     logInfo("assistant query completed", {
       correlationId,
       stage: "assistant",
       status: "success",
-      latencyMs: Date.now() - started,
+      latencyMs,
       exactContextCount: exactContext.length,
       retrievalMode: answer.retrievalMode,
     });
-    metrics.stageLatency.labels("assistant", "success").observe(Date.now() - started);
+    metrics.stageLatency.labels("assistant", "success").observe(latencyMs);
+    await recordAssistantEvent({
+      event: "ASSISTANT_QUERY_COMPLETED",
+      level: "info",
+      traceId: correlationId,
+      userId: session.user.id,
+      question,
+      latencyMs,
+      exactContextCount: exactContext.length,
+      retrievalMode: answer.retrievalMode,
+      sourceCount: answer.sources?.length ?? 0,
+      status: "success",
+    });
     const nextResponse = NextResponse.json({
       ...answer,
       exactContextCount: exactContext.length,
@@ -85,10 +111,63 @@ export async function POST(request: NextRequest) {
       tags: { stage: "assistant", correlation_id: correlationId },
       extra: { exactContextCount: exactContext.length },
     });
+    await recordAssistantEvent({
+      event: "ASSISTANT_QUERY_FAILED",
+      level: "error",
+      traceId: correlationId,
+      userId: session.user.id,
+      question,
+      latencyMs: Date.now() - started,
+      exactContextCount: exactContext.length,
+      status: "error",
+      error: error instanceof Error ? error.message : String(error),
+    });
     return NextResponse.json(
       fallbackAssistantAnswer(question, exactContext, [
         error instanceof Error ? error.message : "AI assistant service unavailable",
       ]),
     );
   }
+}
+
+async function recordAssistantEvent(input: {
+  event: string;
+  level: string;
+  traceId: string;
+  userId: string;
+  question: string;
+  latencyMs: number;
+  exactContextCount: number;
+  status: string;
+  retrievalMode?: string;
+  sourceCount?: number;
+  error?: string;
+}) {
+  await prisma.eventLog
+    .create({
+      data: {
+        event: input.event,
+        level: input.level,
+        traceId: input.traceId,
+        metadata: {
+          stage: "assistant",
+          userId: input.userId,
+          latencyMs: input.latencyMs,
+          exactContextCount: input.exactContextCount,
+          retrievalMode: input.retrievalMode,
+          sourceCount: input.sourceCount,
+          status: input.status,
+          error: input.error,
+          questionPreview: input.question.slice(0, 160),
+        },
+      },
+    })
+    .catch((error) => {
+      logWarn("assistant event persistence failed", {
+        correlationId: input.traceId,
+        stage: "assistant",
+        status: "event_log_failed",
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
 }
