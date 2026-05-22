@@ -1,8 +1,7 @@
-import fs from "node:fs/promises";
-import path from "node:path";
 import type { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { saveVisitImageFile } from "@/lib/storage";
 import { NextResponse } from "next/server";
 
 type Params = { params: Promise<{ id: string }> };
@@ -35,22 +34,15 @@ export async function POST(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "No file provided" }, { status: 400 });
   }
 
-  const uploadsDir = path.join(process.cwd(), "public", "uploads");
-  await fs.mkdir(uploadsDir, { recursive: true });
-
-  const ext = path.extname(file.name) || ".jpg";
-  const filename = `${visitId}-${Date.now()}${ext}`;
-  const localPath = path.join(uploadsDir, filename);
-  const buffer = Buffer.from(await file.arrayBuffer());
-  await fs.writeFile(localPath, buffer);
+  const storedImage = await saveVisitImageFile({ file, visitId });
 
   const image = await prisma.visitImage.create({
     data: {
       visitId,
-      url: `/uploads/${filename}`,
-      localPath,
+      url: storedImage.url,
+      localPath: storedImage.localPath,
       imageHash: imageHash ?? undefined,
-      metadata: { sizeBytes: buffer.length, contentType: file.type },
+      metadata: storedImage.metadata,
     },
   });
 
