@@ -15,10 +15,11 @@ analyze_visit job
   -> save FraudSignal rows
   -> build VisitReport retrieval text
   -> mark visit COMPLETE or FLAGGED
+  -> copy terminal failures to analyze_visit_dlq
   -> write EventLog entries
 ```
 
-The current implementation uses `worker/data/db.json` as a local repository so we can test the pipeline before the Next.js/Prisma app exists. Swap `JsonVisitRepository` with a Prisma repository when the database module lands.
+The worker uses Prisma/Postgres when `DATABASE_URL` is present and `WORKER_USE_PRISMA` is not `false`. It falls back to `worker/data/db.json` for local pipeline tests.
 
 ## Install
 
@@ -61,7 +62,7 @@ Fraud signals:
 Start Redis, then:
 
 ```powershell
-docker compose -f docker-compose.worker.yml up -d redis
+docker compose -f docker-compose.worker.yml up -d redis postgres
 ```
 
 Run the worker and enqueue a demo job:
@@ -84,5 +85,7 @@ WORKER_USE_LLM=true
 ```
 
 `RETAILOS_AI_SERVICE_API_KEY` is optional for local dev. When set on the FastAPI service, the worker sends it as `x-api-key` for `/analyze-shelf`.
+
+Terminal failed `analyze_visit` jobs are copied into `ANALYZE_VISIT_DLQ` with the original payload, attempts, failure reason, and stacktrace so the job can be inspected and replayed.
 
 See [docs/BACKEND_HANDOFF.md](../docs/BACKEND_HANDOFF.md) for the Next.js integration contract and dashboard fields.

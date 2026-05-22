@@ -63,6 +63,28 @@ Invoke-RestMethod `
 
 Use `/detect-yolo` when you only need raw model output for debugging.
 
+## API Key Protection
+
+Local dev works without a key. To protect inference endpoints, set:
+
+```powershell
+$env:RETAILOS_AI_SERVICE_API_KEY='shared-dev-secret'
+```
+
+Then callers must send:
+
+```text
+x-api-key: shared-dev-secret
+```
+
+Protected endpoints:
+
+- `POST /analyze-shelf`
+- `POST /detect-yolo`
+- `POST /detect-yolo/upload`
+
+Health, readiness, model metadata, and overlay artifacts remain open for smoke tests and dashboard rendering.
+
 ## LLM POSM Analysis
 
 Set `OPENAI_API_KEY` to enable LLM-based POSM and shelf-quality analysis.

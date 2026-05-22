@@ -15,6 +15,7 @@ Visit image
   -> optional OpenAI vision POSM analysis
   -> compliance scoring
   -> BullMQ worker persistence flow
+  -> optional DLQ capture for terminal worker failures
   -> dashboard-ready outcome summary
   -> visit report retrieval text
 ```
@@ -29,11 +30,13 @@ Implemented modules:
 | OpenAI POSM analysis | Implemented | Optional vision LLM layer for Olympic POSM and summary |
 | Compliance scoring | Implemented | Deterministic rules with score, status, reasons, action |
 | Worker orchestration | Implemented | BullMQ `analyze_visit` job calls AI service and saves output |
+| Dead-letter queue | Implemented | Terminal failed `analyze_visit` jobs are copied to `analyze_visit_dlq` |
 | Fraud checks | Implemented | Exact duplicate, perceptual duplicate, GPS mismatch, timestamp anomaly, EXIF GPS/time checks |
+| Image storage | Implemented | Local disk by default; S3-compatible MinIO/R2/S3 driver available |
 | Offline sync | Implemented | Rep visits queue in IndexedDB and sync through TanStack Query when online |
 | Visit report text | Implemented | Builds fact-heavy text for later RAG embedding |
 | Embedding worker | Not implemented | Queue is created, but no consumer exists yet |
-| Real database repository | Not implemented | Current repository is JSON-file backed for local testing |
+| Real database repository | Implemented | Worker uses Prisma when `DATABASE_URL` is set; JSON remains a local fallback |
 
 ## Runtime Services
 
@@ -59,6 +62,7 @@ Copy `.env.example` to `.env`.
 ```env
 # AI service
 AI_SERVICE_URL=http://127.0.0.1:8001
+RETAILOS_AI_SERVICE_API_KEY=
 RETAILOS_YOLO_MODEL_PATH=E:\Projects\RetailOS-Lite\Detection Model\best.pt
 RETAILOS_YOLO_BACKEND=local
 RETAILOS_MODAL_YOLO_URL=
@@ -69,9 +73,23 @@ RETAILOS_LLM_MODEL=gpt-4o-mini
 RETAILOS_CORS_ORIGINS=*
 OPENAI_API_KEY=
 
+# Image/object storage
+IMAGE_STORAGE_DRIVER=local
+IMAGE_STORAGE_LOCAL_DIR=public/uploads
+IMAGE_STORAGE_LOCAL_PUBLIC_BASE=/uploads
+IMAGE_STORAGE_PUBLIC_BASE_URL=http://127.0.0.1:9000/retailos-images
+S3_ENDPOINT=http://127.0.0.1:9000
+S3_REGION=us-east-1
+S3_BUCKET=retailos-images
+S3_ACCESS_KEY_ID=retailos
+S3_SECRET_ACCESS_KEY=retailos-secret
+S3_FORCE_PATH_STYLE=true
+S3_PREFIX=uploads
+
 # Worker
 REDIS_URL=redis://127.0.0.1:6379
 ANALYZE_VISIT_QUEUE=analyze_visit
+ANALYZE_VISIT_DLQ=analyze_visit_dlq
 EMBED_VISIT_REPORT_QUEUE=embed_visit_report
 WORKER_CONCURRENCY=2
 WORKER_USE_LLM=true
@@ -89,6 +107,59 @@ RETAILOS_YOLO_BACKEND=modal
 RETAILOS_MODAL_YOLO_URL=https://nfr12388--retailos-yolo-gpu-yologpuendpoint-detect.modal.run
 RETAILOS_YOLO_FALLBACK_LOCAL=true
 ```
+
+## Image Storage
+
+Uploads go through `lib/storage.ts` instead of writing directly inside the API route.
+
+Default local mode:
+
+```env
+IMAGE_STORAGE_DRIVER=local
+```
+
+This writes to `public/uploads` and returns `/uploads/...`, which is fastest for local demos.
+
+MinIO/S3-compatible mode:
+
+```env
+IMAGE_STORAGE_DRIVER=s3
+S3_ENDPOINT=http://127.0.0.1:9000
+S3_BUCKET=retailos-images
+S3_ACCESS_KEY_ID=retailos
+S3_SECRET_ACCESS_KEY=retailos-secret
+IMAGE_STORAGE_PUBLIC_BASE_URL=http://127.0.0.1:9000/retailos-images
+```
+
+Start local object storage:
+
+```powershell
+docker compose -f docker-compose.worker.yml up -d minio minio-init
+```
+
+Production swap:
+
+- Keep the same storage driver.
+- Replace MinIO endpoint and credentials with Cloudflare R2, AWS S3, Supabase Storage S3, or another S3-compatible bucket.
+- A later optimization can move browser uploads to pre-signed URLs, but the persistence bottleneck is already isolated.
+
+## AI Service Auth
+
+`/health`, `/ready`, `/model`, and `/artifacts/...` remain open for local checks and image rendering.
+
+Inference endpoints are protected when an API key is configured:
+
+```env
+RETAILOS_AI_SERVICE_API_KEY=shared-dev-secret
+```
+
+Protected endpoints:
+
+- `POST /analyze-shelf`
+- `POST /detect-yolo`
+- `POST /detect-yolo/upload`
+
+The worker automatically sends the same value as `x-api-key` when configured.
 
 ## AI Service API
 
@@ -496,6 +567,7 @@ Failure lifecycle:
 ANALYZE_VISIT_FAILED
   -> visit status FAILED
   -> BullMQ retry according to job options
+  -> after final retry, copy payload/error to analyze_visit_dlq
 ```
 
 Final status logic:
@@ -508,7 +580,7 @@ Final status logic:
 
 ## Dashboard Data Contract
 
-The worker saves `AIResultRecord.outcomeSummary`. This is the field the dashboard should render first.
+The worker saves `AIResultRecord.outcomeSummary` for compliance and summary fields. Fraud signals are stored in the relational `fraud_signals` table and returned separately as `visit.fraudSignals` to avoid dual writes.
 
 Shape:
 
@@ -537,14 +609,7 @@ Shape:
     "detected": false,
     "evidence": "No clearly Olympic-branded POSM is visible.",
     "missingReason": "Olympic-branded signage or shelf material is not visible."
-  },
-  "fraudSignals": [
-    {
-      "type": "GPS_MISMATCH",
-      "severity": "HIGH",
-      "message": "Rep check-in location is far from the outlet location."
-    }
-  ]
+  }
 }
 ```
 
@@ -556,7 +621,7 @@ Recommended dashboard sections:
 - Recommended action.
 - Olympic vs competitor counts.
 - POSM detected/missing badge.
-- Fraud signal badges.
+- Fraud signal badges from `visit.fraudSignals`.
 - Raw image and overlay image.
 
 ## Visit Report For RAG
@@ -697,10 +762,10 @@ Install Node dependencies:
 npm install
 ```
 
-Start Redis:
+Start local infrastructure:
 
 ```powershell
-docker compose -f docker-compose.worker.yml up -d redis
+docker compose -f docker-compose.worker.yml up -d redis postgres minio minio-init
 ```
 
 Start AI service:
@@ -760,10 +825,9 @@ These are intentionally not hidden.
 
 | Gap | Current workaround |
 | --- | --- |
-| No Prisma/Postgres repository | JSON repository for local demo |
-| No object storage integration | Local path or URL input |
 | No embedding worker | Visit report text is generated and queued |
 | No assistant API | Retrieval text and planned data shape exist |
-| No Next.js app yet | Backend contracts are ready |
+| No cloud deployment yet | Local Docker infra and env-driven service URLs are ready |
 | No OTEL/LGTM wiring yet | JSON logs and event log provide interim traceability |
-| No blur/perceptual-hash fraud yet | Exact SHA-256, GPS, timestamp, and EXIF checks exist |
+| No direct-to-bucket pre-signed upload | Server API writes to local disk or S3-compatible object storage |
+| No PgBouncer/Prisma Accelerate | Prisma singleton is used locally; serverless deploy should use pooled `DATABASE_URL` |
