@@ -7,7 +7,7 @@ const navItems = [
   { href: "/supervisor", label: "Overview", icon: LayoutDashboard },
   { href: "/supervisor/visits", label: "Visit Logs", icon: ClipboardList },
   { href: "/supervisor/outlets", label: "Outlet Verification", icon: Store },
-  { href: "/supervisor#ai-insights", label: "AI Insights", icon: Bot },
+  { href: "/supervisor/insights", label: "AI Insights", icon: Bot },
   { href: "/supervisor#settings", label: "Settings", icon: Settings },
 ];
 
