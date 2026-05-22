@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { signOut } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { BarChart3, ClipboardList, LayoutDashboard, LogOut, ShieldCheck, Settings } from "lucide-react";
+import { Bot, ClipboardList, LayoutDashboard, LogOut, Settings } from "lucide-react";
 
 const navItems = [
   { href: "/supervisor", label: "Overview", icon: LayoutDashboard },
   { href: "/supervisor/visits", label: "Visit Logs", icon: ClipboardList },
-  { href: "/supervisor#compliance", label: "Compliance", icon: ShieldCheck },
+  { href: "/supervisor#ai-insights", label: "AI Insights", icon: Bot },
   { href: "/supervisor#settings", label: "Settings", icon: Settings },
 ];
 
@@ -24,12 +24,6 @@ export default function SupervisorLayout({ children }: { children: React.ReactNo
               <p className="mt-1 text-xs text-muted-foreground">Field Execution</p>
             </div>
           </div>
-          <Button asChild size="sm" className="mb-6 bg-navy text-white hover:bg-navy/90">
-            <Link href="/supervisor/visits">
-              <BarChart3 className="mr-2 h-4 w-4" />
-              View Reports
-            </Link>
-          </Button>
           <nav className="space-y-1">
             {navItems.map((item) => (
               <Link
