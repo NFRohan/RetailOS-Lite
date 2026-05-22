@@ -123,6 +123,8 @@ export class PrismaVisitRepository implements VisitRepository {
   }
 
   async saveAIResult(result: AIResultRecord): Promise<void> {
+    const storedOutcomeSummary = outcomeSummaryForStorage(result.outcomeSummary);
+
     await this.prisma.aIResult.upsert({
       where: { visitId: result.visitId },
       create: {
@@ -138,7 +140,7 @@ export class PrismaVisitRepository implements VisitRepository {
         competitors: jsonValue(result.competitors),
         posm: jsonOrUndefined(result.posm),
         overlayImageUrl: result.overlayImageUrl,
-        outcomeSummary: jsonOrUndefined(result.outcomeSummary),
+        outcomeSummary: jsonOrUndefined(storedOutcomeSummary),
         rawModelOutput: jsonValue(result.rawModelOutput),
         createdAt: new Date(result.createdAt),
       },
@@ -154,7 +156,7 @@ export class PrismaVisitRepository implements VisitRepository {
         competitors: jsonValue(result.competitors),
         posm: jsonOrUndefined(result.posm),
         overlayImageUrl: result.overlayImageUrl,
-        outcomeSummary: jsonOrUndefined(result.outcomeSummary),
+        outcomeSummary: jsonOrUndefined(storedOutcomeSummary),
         rawModelOutput: jsonValue(result.rawModelOutput),
       },
     });
@@ -202,6 +204,13 @@ function jsonValue(value: unknown): Prisma.InputJsonValue {
 
 function jsonOrUndefined(value: unknown): Prisma.InputJsonValue | undefined {
   return value === undefined || value === null ? undefined : jsonValue(value);
+}
+
+function outcomeSummaryForStorage(summary: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+  if (!summary) return undefined;
+  const summaryWithoutFraudSignals = { ...summary };
+  delete summaryWithoutFraudSignals.fraudSignals;
+  return summaryWithoutFraudSignals;
 }
 
 function perceptualHashFromMetadata(metadata: Record<string, unknown> | undefined): string | null {

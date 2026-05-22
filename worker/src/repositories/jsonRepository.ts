@@ -95,7 +95,10 @@ export class JsonVisitRepository implements VisitRepository {
   async saveAIResult(result: AIResultRecord): Promise<void> {
     await this.mutate((db) => {
       db.aiResults = db.aiResults.filter((candidate) => candidate.visitId !== result.visitId);
-      db.aiResults.push(result);
+      db.aiResults.push({
+        ...result,
+        outcomeSummary: outcomeSummaryForStorage(result.outcomeSummary),
+      });
     });
   }
 
@@ -137,4 +140,11 @@ function perceptualHashFromMetadata(metadata: Record<string, unknown> | undefine
   if (!fraud || typeof fraud !== "object") return null;
   const value = (fraud as { perceptualHash?: unknown }).perceptualHash;
   return typeof value === "string" ? value : null;
+}
+
+function outcomeSummaryForStorage(summary: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+  if (!summary) return undefined;
+  const summaryWithoutFraudSignals = { ...summary };
+  delete summaryWithoutFraudSignals.fraudSignals;
+  return summaryWithoutFraudSignals;
 }

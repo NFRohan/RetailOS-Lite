@@ -24,7 +24,7 @@ export type OutcomeSummary = {
     confidence: number;
     rationale: string;
   };
-  fraudSignals: Array<{ type: string; severity: string; message: string }>;
+  fraudSignals?: Array<{ type: string; severity: string; message: string }>;
 };
 
 export type VisitDetail = {
