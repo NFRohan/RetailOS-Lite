@@ -82,7 +82,9 @@ export default function SupervisorDashboardPage() {
         <CardHeader className="flex flex-row items-center justify-between border-b bg-white p-6">
           <div>
             <CardTitle className="text-xl text-navy">Recent Visits</CardTitle>
-            <p className="mt-1 text-sm text-muted-foreground">Focusing on Olympic brand visibility trends.</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Focusing on Olympic visibility, POSM, compliance, and fraud review reasons.
+            </p>
           </div>
           <button className="rounded-lg border border-[#c1c7cc] px-3 py-2 text-xs font-semibold text-navy transition-colors hover:border-teal hover:bg-[#e9f7fb]">
             Filter
@@ -200,13 +202,16 @@ function PerformanceTrendCard({
           <TrendingUp className="h-5 w-5" />
           <CardTitle className="text-xs font-semibold uppercase tracking-wide">Visit Quality</CardTitle>
         </div>
-        <span className="text-xs font-semibold text-muted-foreground">Safe visits / total visits</span>
+        <span className="text-xs font-semibold text-muted-foreground">No review reasons / total visits</span>
       </CardHeader>
       <CardContent>
         <div className="flex items-end gap-6">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Safe visit rate</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Clean visit rate</p>
             <p className="text-4xl font-bold text-navy">{score}%</p>
+            <p className="mt-1 max-w-48 text-xs text-muted-foreground">
+              Clean means no fraud, POSM present, and AI compliance at least 70%.
+            </p>
           </div>
           <div className="flex h-14 flex-1 items-end gap-1">
             {trend.slice(-7).map((point) => (

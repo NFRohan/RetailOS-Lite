@@ -31,7 +31,7 @@ export function VisitTable({ visits, basePath = "/supervisor/visits" }: Props) {
             <th className="px-4 py-3">Rep Name</th>
             <th className="px-4 py-3">Timestamp</th>
             <th className="px-4 py-3">AI Compliance</th>
-            <th className="px-4 py-3">Fraud Status</th>
+            <th className="px-4 py-3">Review Status</th>
             <th className="px-4 py-3 text-right">Action</th>
           </tr>
         </thead>
@@ -56,7 +56,7 @@ export function VisitTable({ visits, basePath = "/supervisor/visits" }: Props) {
                 <ComplianceBadge score={visit.complianceScore} status={visit.complianceStatus} />
               </td>
               <td className="px-4 py-3">
-                <FraudStatusBadge visit={visit} />
+                <ReviewStatus visit={visit} />
               </td>
               <td className="px-4 py-3 text-right">
                 <Link
@@ -74,29 +74,43 @@ export function VisitTable({ visits, basePath = "/supervisor/visits" }: Props) {
   );
 }
 
-function FraudStatusBadge({ visit }: { visit: VisitListItem }) {
+function ReviewStatus({ visit }: { visit: VisitListItem }) {
+  const primaryReason = visit.reviewReasons[0];
+
   if (visit.riskStatus === "HIGH_RISK") {
     return (
-      <Badge variant="critical" className="gap-1">
-        <ShieldAlert className="h-3.5 w-3.5" />
-        High Risk
-      </Badge>
+      <div className="space-y-1">
+        <Badge variant="critical" className="gap-1">
+          <ShieldAlert className="h-3.5 w-3.5" />
+          High Risk
+        </Badge>
+        {primaryReason && <p className="max-w-64 text-xs text-muted-foreground">{primaryReason}</p>}
+      </div>
     );
   }
 
   if (visit.riskStatus === "REVIEW_NEEDED" || visit.fraudCount > 0) {
     return (
-      <Badge variant="warning" className="gap-1">
-        <AlertTriangle className="h-3.5 w-3.5" />
-        Review Needed
-      </Badge>
+      <div className="space-y-1">
+        <Badge variant="warning" className="gap-1">
+          <AlertTriangle className="h-3.5 w-3.5" />
+          Review Needed
+        </Badge>
+        <p className="max-w-64 text-xs text-muted-foreground">
+          {primaryReason ?? "Supervisor review required"}
+          {visit.fraudCount === 0 ? " • No fraud signals" : ""}
+        </p>
+      </div>
     );
   }
 
   return (
-    <Badge variant="success" className="gap-1">
-      <CheckCircle2 className="h-3.5 w-3.5" />
-      Safe
-    </Badge>
+    <div className="space-y-1">
+      <Badge variant="success" className="gap-1">
+        <CheckCircle2 className="h-3.5 w-3.5" />
+        Clean
+      </Badge>
+      <p className="max-w-64 text-xs text-muted-foreground">No review reasons</p>
+    </div>
   );
 }

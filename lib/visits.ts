@@ -60,6 +60,13 @@ export function serializeVisitListItem(visit: VisitWithRelations): VisitListItem
   const highFraud = visit.fraudSignals.some((f) => f.severity === "HIGH");
   const complianceScore = visit.aiResult?.complianceScore ?? null;
   const hasMissingPosm = posmDetected(visit.aiResult?.posm) === false || outcome?.posm.detected === false;
+  const reviewReasons = reviewReasonsForVisit({
+    visitStatus: visit.status,
+    complianceScore,
+    fraudSignals: visit.fraudSignals,
+    hasMissingPosm,
+    outcome,
+  });
   const riskStatus = riskStatusForVisit({
     visitStatus: visit.status,
     complianceScore,
@@ -82,6 +89,7 @@ export function serializeVisitListItem(visit: VisitWithRelations): VisitListItem
     fraudCount: visit.fraudSignals.length,
     hasHighFraud: highFraud,
     hasMissingPosm,
+    reviewReasons,
     riskStatus,
   };
 }
@@ -90,6 +98,51 @@ function posmDetected(posm: unknown): boolean | null {
   if (!posm || typeof posm !== "object") return null;
   const detected = (posm as { detected?: unknown }).detected;
   return typeof detected === "boolean" ? detected : null;
+}
+
+function reviewReasonsForVisit({
+  visitStatus,
+  complianceScore,
+  fraudSignals,
+  hasMissingPosm,
+  outcome,
+}: {
+  visitStatus: string;
+  complianceScore: number | null;
+  fraudSignals: VisitWithRelations["fraudSignals"];
+  hasMissingPosm: boolean;
+  outcome: OutcomeSummary | null;
+}): string[] {
+  const reasons: string[] = [];
+
+  if (fraudSignals.length > 0) {
+    const highSeverity = fraudSignals.filter((signal) => signal.severity === "HIGH");
+    const signals = highSeverity.length > 0 ? highSeverity : fraudSignals;
+    reasons.push(
+      ...signals.slice(0, 2).map((signal) => `${humanizeSignalType(signal.type)}: ${signal.message}`),
+    );
+  }
+
+  if (complianceScore !== null && complianceScore < 50) {
+    reasons.push(`Critical AI compliance score (${complianceScore}%)`);
+  } else if (complianceScore !== null && complianceScore < 70) {
+    reasons.push(`AI compliance below 70% target (${complianceScore}%)`);
+  }
+
+  if (hasMissingPosm) {
+    const missingReason = outcome?.posm.missingReason?.trim();
+    reasons.push(missingReason ? `Missing POSM: ${missingReason}` : "Missing POSM");
+  }
+
+  if (visitStatus === "FLAGGED" && reasons.length === 0) {
+    reasons.push("AI worker flagged this visit for supervisor review");
+  }
+
+  if (visitStatus === "FAILED") {
+    reasons.push("AI analysis failed");
+  }
+
+  return [...new Set(reasons)];
 }
 
 function riskStatusForVisit({
@@ -110,4 +163,12 @@ function riskStatusForVisit({
     return "REVIEW_NEEDED";
   }
   return "SAFE";
+}
+
+function humanizeSignalType(type: string): string {
+  return type
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }

@@ -111,6 +111,7 @@ export type VisitListItem = {
   fraudCount: number;
   hasHighFraud: boolean;
   hasMissingPosm: boolean;
+  reviewReasons: string[];
   riskStatus: "SAFE" | "REVIEW_NEEDED" | "HIGH_RISK";
 };
 
