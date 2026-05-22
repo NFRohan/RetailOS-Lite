@@ -42,36 +42,47 @@ export default function SupervisorLayout({ children }: { children: React.ReactNo
               </Link>
             ))}
           </nav>
-          <form
-            className="mt-auto"
-            action={async () => {
-              "use server";
-              await signOut({ redirectTo: "/login" });
-            }}
-          >
-            <Button variant="ghost" size="sm" type="submit" className="text-navy/60 hover:text-navy">
-              <LogOut className="mr-2 h-4 w-4" />
-              Sign out
-            </Button>
-          </form>
+          <div className="mt-auto rounded-2xl border border-[#d7ddeb] bg-white/70 p-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal">Signed in</p>
+            <p className="mt-1 text-sm font-semibold text-navy">Supervisor</p>
+            <SupervisorLogoutButton className="mt-3 w-full justify-start text-navy/70 hover:text-navy" />
+          </div>
         </aside>
         <div className="flex flex-1 flex-col">
-          <header className="flex h-14 items-center justify-between border-b bg-white/85 px-6 backdrop-blur lg:hidden">
-            <span className="font-bold text-navy">RetailOS Lite</span>
-            <form
-              action={async () => {
-                "use server";
-                await signOut({ redirectTo: "/login" });
-              }}
-            >
-              <Button variant="ghost" size="icon" type="submit">
-                <LogOut className="h-4 w-4" />
-              </Button>
-            </form>
+          <header className="flex h-16 items-center justify-between border-b border-[#d7ddeb] bg-white/85 px-6 backdrop-blur">
+            <div>
+              <span className="font-bold text-navy lg:hidden">RetailOS Lite</span>
+              <div className="hidden lg:block">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-teal">Supervisor Workspace</p>
+                <p className="text-sm text-muted-foreground">Review field execution and AI compliance results</p>
+              </div>
+            </div>
+            <SupervisorLogoutButton compact />
           </header>
           <main className="flex-1 p-6 lg:p-8">{children}</main>
         </div>
       </div>
     </div>
+  );
+}
+
+function SupervisorLogoutButton({ className, compact = false }: { className?: string; compact?: boolean }) {
+  return (
+    <form
+      action={async () => {
+        "use server";
+        await signOut({ redirectTo: "/login" });
+      }}
+    >
+      <Button
+        variant={compact ? "outline" : "ghost"}
+        size={compact ? "sm" : "sm"}
+        type="submit"
+        className={compact ? "rounded-full bg-white text-navy hover:bg-[#eef2fb]" : className}
+      >
+        <LogOut className="h-4 w-4" />
+        <span className={compact ? "hidden sm:inline" : ""}>Sign out</span>
+      </Button>
+    </form>
   );
 }
