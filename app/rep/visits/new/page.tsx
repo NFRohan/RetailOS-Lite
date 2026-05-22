@@ -163,7 +163,7 @@ export default function NewVisitPage() {
     };
     const syncInput = {
       payload,
-      photos: photos.map((photo) => ({
+      photos: photos.slice(0, 1).map((photo) => ({
         file: photo.file,
         hash: photo.hash,
         name: photo.file.name,
@@ -375,7 +375,7 @@ export default function NewVisitPage() {
         <Card className="border-[#d6ddea] bg-white shadow-[0_12px_32px_rgba(2,43,58,0.08)]">
           <CardHeader className="pb-4">
             <CardTitle className="text-lg text-navy">Shelf Evidence</CardTitle>
-            <p className="text-sm text-muted-foreground">Upload the full shelf and any POSM material in frame.</p>
+            <p className="text-sm text-muted-foreground">Upload one full-shelf image with any POSM material in frame.</p>
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="rounded-2xl border border-teal/20 bg-cyan-50/70 p-4">
@@ -384,7 +384,7 @@ export default function NewVisitPage() {
                 <div>
                   <p className="font-semibold text-navy">Photo checklist</p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Include Olympic packs, competitor packs, shelf rows, and visible POSM if present.
+                    Capture Olympic packs, competitor packs, shelf rows, and visible POSM in a single frame.
                   </p>
                 </div>
               </div>
@@ -423,7 +423,7 @@ export default function NewVisitPage() {
                   }
                 />
                 <ReviewRow label="GPS" value={gps ? `${gps.lat.toFixed(5)}, ${gps.lng.toFixed(5)}` : "Not captured"} />
-                <ReviewRow label="Photos" value={`${photos.length} image${photos.length === 1 ? "" : "s"}`} />
+                <ReviewRow label="Image" value={photos.length > 0 ? "1 shelf image" : "Not uploaded"} />
                 <ReviewRow label="Notes" value={notes || "No notes added"} />
               </dl>
             </div>

@@ -75,8 +75,7 @@ export default function RepVisitsPage() {
                   <p className="font-bold text-amber-950">{submission.payload.outletName}</p>
                 </div>
                 <p className="text-xs text-amber-800">
-                  {formatDate(submission.createdAt)} - {submission.photos.length} queued photo
-                  {submission.photos.length === 1 ? "" : "s"}
+                  {formatDate(submission.createdAt)} - 1 queued shelf image
                 </p>
                 {submission.lastError && <p className="text-xs text-amber-800">Last error: {submission.lastError}</p>}
               </div>

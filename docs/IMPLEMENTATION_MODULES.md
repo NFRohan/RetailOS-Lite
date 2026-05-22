@@ -252,12 +252,12 @@ Owner: Developer B, with API support from Developer A
 
 Purpose:
 
-Let reps capture visits and photos without network.
+Let reps capture visits and one shelf photo without network.
 
 Frontend responsibilities:
 
 - Store drafts in IndexedDB
-- Store image blobs in IndexedDB
+- Store one shelf image blob in IndexedDB
 - Show offline banner
 - Show pending sync count
 - Retry failed sync

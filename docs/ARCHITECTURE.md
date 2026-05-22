@@ -295,7 +295,7 @@ Offline sync is a bonus feature, but it fits the field-rep workflow well.
 
 MVP behavior:
 
-- Store visit draft and image blobs in IndexedDB.
+- Store visit draft and one shelf image blob in IndexedDB.
 - Use client-generated visit ids.
 - Show pending sync status.
 - When online, upload image first, submit visit second, enqueue analysis third.

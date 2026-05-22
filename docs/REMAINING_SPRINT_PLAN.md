@@ -295,7 +295,7 @@ Offline capture is an impressive bonus and realistic for field reps.
 
 Deliverables:
 
-- IndexedDB store for visit drafts, image blobs, and sync outbox. `DONE`
+- IndexedDB store for visit drafts, one shelf image blob, and sync outbox. `DONE`
 - Client-generated ids for offline visits. `DONE`
 - Online/offline indicator. `DONE`
 - Background sync loop that uploads pending visits when online. `DONE`
@@ -304,7 +304,7 @@ Deliverables:
 Definition of Done:
 
 - Rep can create visit while offline.
-- Rep can attach shelf image while offline.
+- Rep can attach one shelf image while offline.
 - Draft survives page refresh through IndexedDB.
 - When online, visit is created, images upload, and worker job enqueues.
 - UI shows `Pending sync`, `Syncing`, or `Retry needed`; synced visits move into normal visit history.

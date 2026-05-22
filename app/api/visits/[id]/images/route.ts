@@ -19,6 +19,14 @@ export async function POST(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  const existingImage = await prisma.visitImage.findFirst({
+    where: { visitId },
+    select: { id: true },
+  });
+  if (existingImage) {
+    return NextResponse.json({ error: "Only one shelf image is allowed per visit." }, { status: 409 });
+  }
+
   const formData = await request.formData();
   const file = formData.get("file") as File | null;
   const imageHash = formData.get("imageHash") as string | null;

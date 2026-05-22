@@ -98,7 +98,7 @@ export async function queueOfflineVisitSubmission(input: OnlineVisitSubmissionIn
     status: "queued",
     attemptCount: 0,
     payload: input.payload,
-    photos: input.photos.map((photo) => ({
+    photos: input.photos.slice(0, 1).map((photo) => ({
       file: photo.file,
       hash: photo.hash,
       name: photo.name || photo.file.name,
@@ -184,9 +184,12 @@ export async function submitVisitOnline(input: OnlineVisitSubmissionInput): Prom
   });
 
   const uploadedHashes = new Set((visit.images ?? []).map((image) => image.imageHash).filter(Boolean));
-  for (const photo of input.photos) {
-    if (uploadedHashes.has(photo.hash)) continue;
+  const photo = input.photos[0];
+  if (!photo) {
+    throw new VisitSyncHttpError("Upload one shelf image before submitting.", 400);
+  }
 
+  if (!uploadedHashes.has(photo.hash)) {
     const form = new FormData();
     form.append("file", fileForUpload(photo));
     form.append("imageHash", photo.hash);

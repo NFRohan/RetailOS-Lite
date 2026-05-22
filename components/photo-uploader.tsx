@@ -21,13 +21,15 @@ export function PhotoUploader({ photos, onChange }: Props) {
 
   const addFiles = useCallback(
     async (files: FileList | File[]) => {
-      const list = Array.from(files).filter((f) => f.type.startsWith("image/"));
-      const newPhotos: PhotoFile[] = [];
-      for (const file of list) {
-        const hash = await hashFileSha256(file);
-        newPhotos.push({ file, preview: URL.createObjectURL(file), hash });
+      const file = Array.from(files).find((candidate) => candidate.type.startsWith("image/"));
+      if (!file) return;
+
+      for (const photo of photos) {
+        URL.revokeObjectURL(photo.preview);
       }
-      onChange([...photos, ...newPhotos]);
+
+      const hash = await hashFileSha256(file);
+      onChange([{ file, preview: URL.createObjectURL(file), hash }]);
     },
     [photos, onChange],
   );
@@ -58,16 +60,15 @@ export function PhotoUploader({ photos, onChange }: Props) {
         <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#eef2fb] text-teal">
           <Upload className="h-7 w-7" />
         </div>
-        <p className="mb-1 text-sm font-semibold text-navy">Drop shelf photos here</p>
-        <p className="mb-4 text-xs text-muted-foreground">JPG or PNG, full shelf preferred</p>
+        <p className="mb-1 text-sm font-semibold text-navy">Drop one shelf photo here</p>
+        <p className="mb-4 text-xs text-muted-foreground">JPG or PNG, full shelf preferred. New uploads replace the current image.</p>
         <label>
           <Button type="button" variant="outline" className="rounded-full bg-white" asChild>
-            <span>Browse files</span>
+            <span>{photos.length > 0 ? "Replace image" : "Browse file"}</span>
           </Button>
           <input
             type="file"
             accept="image/*"
-            multiple
             className="hidden"
             onChange={(e) => e.target.files && void addFiles(e.target.files)}
           />
@@ -75,7 +76,7 @@ export function PhotoUploader({ photos, onChange }: Props) {
       </div>
 
       {photos.length > 0 && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3">
           {photos.map((photo, i) => (
             <div key={photo.hash} className="group relative aspect-square overflow-hidden rounded-2xl border border-[#d6ddea]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
