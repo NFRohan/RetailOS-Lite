@@ -158,3 +158,29 @@ Invoke-RestMethod http://localhost:8001/ready
 ```
 
 It returns `503` when the selected YOLO backend is misconfigured.
+
+## Observability
+
+The AI service emits structured JSON logs, Sentry errors, and Prometheus metrics for YOLO, OpenAI, Pinecone, and assistant stages.
+
+Metrics:
+
+```text
+http://127.0.0.1:8001/metrics
+```
+
+Enable local Loki ingestion through Promtail:
+
+```powershell
+$env:LOG_TO_FILE='true'
+uvicorn ai_service.app.main:app --reload --port 8001
+```
+
+Sentry:
+
+```powershell
+$env:SENTRY_DSN='https://...'
+$env:SENTRY_TRACES_SAMPLE_RATE='0.1'
+```
+
+See [docs/OBSERVABILITY.md](../docs/OBSERVABILITY.md) for the full LGTM setup.

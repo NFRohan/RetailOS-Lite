@@ -40,6 +40,7 @@ Implemented modules:
 | Embedding worker | Implemented | Consumes `embed_visit_report` and indexes reports via AI service |
 | Supervisor assistant | Implemented | Next.js route uses exact Prisma context plus AI service vector retrieval |
 | Real database repository | Implemented | Worker uses Prisma when `DATABASE_URL` is set; JSON remains a local fallback |
+| Observability | Implemented | Sentry, structured logs, Prometheus metrics, LGTM compose, `/supervisor/ops` |
 
 ## Runtime Services
 
@@ -58,6 +59,8 @@ Implemented modules:
 | Report builder | `worker/src/services/reportBuilder.ts` | RAG-ready retrieval text |
 | Assistant API | `app/api/assistant/query/route.ts` | Authenticated supervisor assistant route |
 | RAG service | `ai_service/app/rag.py` | OpenAI embeddings, Pinecone search, GPT answer generation |
+| Ops dashboard | `app/supervisor/ops/page.tsx` | EventLog timelines, queue health, worker failures |
+| Observability docs | `docs/OBSERVABILITY.md` | Sentry and LGTM setup |
 | Modal endpoint | `modal_gpu/yolo_endpoint.py` | GPU YOLO detection endpoint |
 
 ## Environment
@@ -97,6 +100,12 @@ S3_ACCESS_KEY_ID=retailos
 S3_SECRET_ACCESS_KEY=retailos-secret
 S3_FORCE_PATH_STYLE=true
 S3_PREFIX=uploads
+
+# Observability
+LOG_TO_FILE=false
+SENTRY_DSN=
+SENTRY_TRACES_SAMPLE_RATE=0.1
+WORKER_METRICS_PORT=9101
 
 # Worker
 REDIS_URL=redis://127.0.0.1:6379
@@ -899,6 +908,8 @@ Expected acceptance criteria:
 - `npm run rag:index-reports -- --dry-run --limit=3` lists reports without indexing.
 - `/supervisor/insights` renders the assistant UI.
 - `POST /api/assistant/query` returns an answer with citations for supervisors/admins.
+- `/supervisor/ops` renders queue health, failures, and visit processing timelines.
+- `/api/metrics`, `:9101/metrics`, and `:8001/metrics` expose Prometheus metrics.
 
 ## Known Production Gaps
 
@@ -907,7 +918,6 @@ These are intentionally not hidden.
 | Gap | Current workaround |
 | --- | --- |
 | No cloud deployment yet | Local Docker infra and env-driven service URLs are ready |
-| No OTEL/LGTM wiring yet | JSON logs and event log provide interim traceability |
 | No direct-to-bucket pre-signed upload | Server API writes to local disk or S3-compatible object storage |
 | No PgBouncer/Prisma Accelerate | Prisma singleton is used locally; serverless deploy should use pooled `DATABASE_URL` |
 | Limited assistant intent parser | Exact compliance/POSM/fraud/review paths exist; broader NL questions fall back to vector retrieval |
