@@ -34,21 +34,21 @@ export function OutletCombobox({ outlets, value, onChange }: Props) {
       <Button
         type="button"
         variant="outline"
-        className="w-full justify-between font-normal"
+        className="h-12 w-full justify-between rounded-2xl border-[#d6ddea] bg-[#f9f9ff] font-normal text-navy"
         onClick={() => setOpen(!open)}
       >
         <span className="flex items-center gap-2 truncate">
-          <Store className="h-4 w-4 shrink-0 text-muted-foreground" />
-          {selected ? `${selected.name} (${selected.code})` : "Select outlet…"}
+          <Store className="h-4 w-4 shrink-0 text-teal" />
+          {selected ? `${selected.name} (${selected.code})` : "Select outlet..."}
         </span>
         <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
       </Button>
 
       {open && (
-        <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-lg">
+        <div className="absolute z-50 mt-2 w-full overflow-hidden rounded-2xl border border-[#d6ddea] bg-white shadow-lg">
           <input
-            className="w-full border-b bg-transparent px-3 py-2 text-sm outline-none"
-            placeholder="Search outlets…"
+            className="w-full border-b border-[#d6ddea] bg-transparent px-3 py-3 text-sm outline-none"
+            placeholder="Search outlets..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -58,7 +58,7 @@ export function OutletCombobox({ outlets, value, onChange }: Props) {
                 <button
                   type="button"
                   className={cn(
-                    "flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-sm hover:bg-accent",
+                    "flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left text-sm hover:bg-[#eef2fb]",
                     value === outlet.id && "bg-accent",
                   )}
                   onClick={() => {

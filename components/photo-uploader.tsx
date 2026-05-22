@@ -51,15 +51,17 @@ export function PhotoUploader({ photos, onChange }: Props) {
           void addFiles(e.dataTransfer.files);
         }}
         className={cn(
-          "flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 transition-colors",
-          dragging ? "border-gold bg-gold/5" : "border-muted-foreground/25 hover:border-gold/50",
+          "flex flex-col items-center justify-center rounded-3xl border-2 border-dashed bg-[#f9f9ff] p-8 text-center transition-colors",
+          dragging ? "border-teal bg-cyan-50" : "border-[#b9c4d8] hover:border-teal/60",
         )}
       >
-        <Upload className="mb-3 h-10 w-10 text-muted-foreground" />
-        <p className="mb-1 text-sm font-medium">Drop shelf photos here</p>
-        <p className="mb-4 text-xs text-muted-foreground">JPG or PNG</p>
+        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#eef2fb] text-teal">
+          <Upload className="h-7 w-7" />
+        </div>
+        <p className="mb-1 text-sm font-semibold text-navy">Drop shelf photos here</p>
+        <p className="mb-4 text-xs text-muted-foreground">JPG or PNG, full shelf preferred</p>
         <label>
-          <Button type="button" variant="outline" asChild>
+          <Button type="button" variant="outline" className="rounded-full bg-white" asChild>
             <span>Browse files</span>
           </Button>
           <input
@@ -75,7 +77,7 @@ export function PhotoUploader({ photos, onChange }: Props) {
       {photos.length > 0 && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {photos.map((photo, i) => (
-            <div key={photo.hash} className="group relative aspect-square overflow-hidden rounded-lg border">
+            <div key={photo.hash} className="group relative aspect-square overflow-hidden rounded-2xl border border-[#d6ddea]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={photo.preview} alt="" className="h-full w-full object-cover" />
               <button
@@ -87,7 +89,7 @@ export function PhotoUploader({ photos, onChange }: Props) {
               </button>
               <div className="absolute bottom-0 left-0 right-0 flex items-center gap-1 bg-black/50 px-2 py-1 text-[10px] text-white">
                 <ImageIcon className="h-3 w-3" />
-                {photo.hash.slice(0, 8)}…
+                {photo.hash.slice(0, 8)}...
               </div>
             </div>
           ))}
