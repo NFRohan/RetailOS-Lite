@@ -18,6 +18,8 @@ Visit image
   -> optional DLQ capture for terminal worker failures
   -> dashboard-ready outcome summary
   -> visit report retrieval text
+  -> OpenAI embedding + Pinecone vector index
+  -> supervisor assistant exact SQL + RAG answers
 ```
 
 Implemented modules:
@@ -34,8 +36,9 @@ Implemented modules:
 | Fraud checks | Implemented | Exact duplicate, perceptual duplicate, GPS mismatch, timestamp anomaly, EXIF GPS/time checks |
 | Image storage | Implemented | Local disk by default; S3-compatible MinIO/R2/S3 driver available |
 | Offline sync | Implemented | Rep visits queue in IndexedDB and sync through TanStack Query when online |
-| Visit report text | Implemented | Builds fact-heavy text for later RAG embedding |
-| Embedding worker | Not implemented | Queue is created, but no consumer exists yet |
+| Visit report text | Implemented | Builds fact-heavy text for RAG embedding |
+| Embedding worker | Implemented | Consumes `embed_visit_report` and indexes reports via AI service |
+| Supervisor assistant | Implemented | Next.js route uses exact Prisma context plus AI service vector retrieval |
 | Real database repository | Implemented | Worker uses Prisma when `DATABASE_URL` is set; JSON remains a local fallback |
 
 ## Runtime Services
@@ -53,6 +56,8 @@ Implemented modules:
 | Offline sync hook | `hooks/use-offline-visit-sync.ts` | TanStack Query queue polling and retry orchestration |
 | Outcome summary | `worker/src/services/outcomeSummary.ts` | Dashboard-ready final explanation |
 | Report builder | `worker/src/services/reportBuilder.ts` | RAG-ready retrieval text |
+| Assistant API | `app/api/assistant/query/route.ts` | Authenticated supervisor assistant route |
+| RAG service | `ai_service/app/rag.py` | OpenAI embeddings, Pinecone search, GPT answer generation |
 | Modal endpoint | `modal_gpu/yolo_endpoint.py` | GPU YOLO detection endpoint |
 
 ## Environment
@@ -69,9 +74,15 @@ RETAILOS_MODAL_YOLO_URL=
 RETAILOS_YOLO_FALLBACK_LOCAL=true
 RETAILOS_LLM_ENABLED=true
 RETAILOS_LLM_PROVIDER=openai
-RETAILOS_LLM_MODEL=gpt-4o-mini
+RETAILOS_LLM_MODEL=gpt-5.4-mini
+RETAILOS_CHAT_MODEL=gpt-5.4-mini
+RETAILOS_EMBEDDING_MODEL=text-embedding-3-small
 RETAILOS_CORS_ORIGINS=*
 OPENAI_API_KEY=
+PINECONE_API_KEY=
+PINECONE_INDEX=
+PINECONE_HOST=
+PINECONE_NAMESPACE=retailos-visit-reports
 
 # Image/object storage
 IMAGE_STORAGE_DRIVER=local
@@ -158,6 +169,8 @@ Protected endpoints:
 - `POST /analyze-shelf`
 - `POST /detect-yolo`
 - `POST /detect-yolo/upload`
+- `POST /rag/index-report`
+- `POST /assistant/query`
 
 The worker automatically sends the same value as `x-api-key` when configured.
 
@@ -379,7 +392,7 @@ Response shape:
   },
   "llm": {
     "provider": "openai",
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-mini",
     "posm": {
       "detected": false,
       "confidence": 0.88,
@@ -659,13 +672,75 @@ What exists now:
 
 - Retrieval text is generated.
 - `embed_visit_report` job is enqueued after analysis.
+- The worker consumes `embed_visit_report` and calls `POST /rag/index-report`.
+- The AI service embeds with `text-embedding-3-small` and upserts to Pinecone.
+- `POST /api/assistant/query` adds exact Prisma context, then asks the AI service for a GPT answer.
 
 What remains:
 
-- Embedding generation worker.
-- `pgvector` storage.
-- Assistant query route.
-- SQL tool/query layer for exact compliance questions.
+- Optional pgvector mirror if we want vector search inside Postgres.
+- Better natural-language intent coverage for more ad hoc supervisor questions.
+
+## Supervisor Assistant
+
+Frontend route:
+
+```text
+GET /supervisor/insights
+```
+
+Next.js API:
+
+```text
+POST /api/assistant/query
+```
+
+Request:
+
+```json
+{
+  "question": "Which outlets are failing compliance?"
+}
+```
+
+Response:
+
+```json
+{
+  "answer": "Maa Enterprise and City Mart Dhanmondi are failing compliance...",
+  "citations": [
+    {
+      "visitId": "visit_123",
+      "outletName": "Maa Enterprise",
+      "reason": "Exact database context"
+    }
+  ],
+  "matches": [],
+  "model": "gpt-5.4-mini",
+  "embeddingModel": "text-embedding-3-small",
+  "retrievalMode": "exact_and_vector",
+  "warnings": [],
+  "exactContextCount": 5
+}
+```
+
+Flow:
+
+```text
+question
+  -> auth requires SUPERVISOR or ADMIN
+  -> Prisma exact context for compliance/POSM/fraud/review questions
+  -> FastAPI /assistant/query
+  -> Pinecone semantic matches
+  -> GPT-5.4 mini grounded answer with citations
+```
+
+Backfill existing reports:
+
+```powershell
+npm run rag:index-reports -- --dry-run --limit=10
+npm run rag:index-reports -- --limit=100
+```
 
 ## Repository Contract
 
@@ -681,6 +756,7 @@ findImagesByHash(imageHash, excludeVisitId)
 saveFraudSignals(signals)
 saveAIResult(result)
 saveVisitReport(report)
+getVisitReport(visitId)
 addEvent(event)
 ```
 
@@ -818,6 +894,9 @@ Expected acceptance criteria:
 - `/analyze-shelf` returns YOLO counts, compliance reasons, summary, and optional POSM result.
 - `worker:dry-run` prints compliance reasons and fraud signals.
 - Queued job completes and saves AI result, fraud signals, visit report, and event log.
+- `npm run rag:index-reports -- --dry-run --limit=3` lists reports without indexing.
+- `/supervisor/insights` renders the assistant UI.
+- `POST /api/assistant/query` returns an answer with citations for supervisors/admins.
 
 ## Known Production Gaps
 
@@ -825,9 +904,8 @@ These are intentionally not hidden.
 
 | Gap | Current workaround |
 | --- | --- |
-| No embedding worker | Visit report text is generated and queued |
-| No assistant API | Retrieval text and planned data shape exist |
 | No cloud deployment yet | Local Docker infra and env-driven service URLs are ready |
 | No OTEL/LGTM wiring yet | JSON logs and event log provide interim traceability |
 | No direct-to-bucket pre-signed upload | Server API writes to local disk or S3-compatible object storage |
 | No PgBouncer/Prisma Accelerate | Prisma singleton is used locally; serverless deploy should use pooled `DATABASE_URL` |
+| Limited assistant intent parser | Exact compliance/POSM/fraud/review paths exist; broader NL questions fall back to vector retrieval |

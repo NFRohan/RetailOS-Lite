@@ -1,6 +1,6 @@
 # RetailOS Lite AI Service
 
-FastAPI service for YOLO shelf detection.
+FastAPI service for YOLO shelf detection, OpenAI POSM analysis, and RAG assistant retrieval.
 
 ## Run A Local Smoke Test
 
@@ -82,6 +82,8 @@ Protected endpoints:
 - `POST /analyze-shelf`
 - `POST /detect-yolo`
 - `POST /detect-yolo/upload`
+- `POST /rag/index-report`
+- `POST /assistant/query`
 
 Health, readiness, model metadata, and overlay artifacts remain open for smoke tests and dashboard rendering.
 
@@ -91,7 +93,7 @@ Set `OPENAI_API_KEY` to enable LLM-based POSM and shelf-quality analysis.
 
 ```powershell
 $env:OPENAI_API_KEY='sk-...'
-$env:RETAILOS_LLM_MODEL='gpt-4o-mini'
+$env:RETAILOS_LLM_MODEL='gpt-5.4-mini'
 ```
 
 The service also auto-loads secrets from either `.env` or `ai_service/.env`.
@@ -109,6 +111,40 @@ When enabled, `/analyze-shelf` adds:
 - `llm.recommendedAction`
 
 If the key is missing, `llm` is `null` and the service falls back to YOLO-only compliance and deterministic summaries.
+
+## RAG Assistant
+
+Set OpenAI and Pinecone env vars in `ai_service/.env`:
+
+```powershell
+$env:RETAILOS_CHAT_MODEL='gpt-5.4-mini'
+$env:RETAILOS_EMBEDDING_MODEL='text-embedding-3-small'
+$env:PINECONE_API_KEY='...'
+$env:PINECONE_INDEX='retailos'
+$env:PINECONE_HOST='https://your-index-host.svc...pinecone.io'
+$env:PINECONE_NAMESPACE='retailos-visit-reports'
+```
+
+Index a report:
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri http://localhost:8001/rag/index-report `
+  -Headers @{ 'x-api-key' = 'shared-dev-secret' } `
+  -ContentType 'application/json' `
+  -Body (@{
+    visitId = 'visit_demo_001'
+    outletId = 'outlet_rahim_store'
+    title = 'Rahim Store visit compliance 42'
+    summary = 'POSM missing and competitor pressure is high.'
+    retrievalText = 'Outlet: Rahim Store...'
+    facts = @{}
+    createdAt = '2026-05-23T00:00:00.000Z'
+  } | ConvertTo-Json -Depth 6)
+```
+
+Ask a question through Next.js `POST /api/assistant/query`; the Next route adds exact Postgres context before proxying to the AI service.
 
 ## Readiness
 
