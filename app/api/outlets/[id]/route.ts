@@ -1,13 +1,12 @@
-import { Prisma, type OutletVerificationStatus } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { normalizeOutletName, numberOrNull } from "@/lib/outlets";
+import { parseOutletVerificationStatus, type OutletVerificationStatus } from "@/lib/outlet-types";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
 type Params = { params: Promise<{ id: string }> };
-
-const editableStatuses = ["VERIFIED", "UNVERIFIED", "REJECTED"] as const;
 
 export async function PATCH(request: NextRequest, { params }: Params) {
   const session = await auth();
@@ -17,7 +16,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
   const { id } = await params;
   const body = await request.json();
-  const verificationStatus = parseOutletStatus(body.verificationStatus);
+  const verificationStatus = parseOutletVerificationStatus(body.verificationStatus);
   if (!verificationStatus) {
     return NextResponse.json({ error: "Valid verificationStatus is required." }, { status: 400 });
   }
@@ -84,11 +83,4 @@ async function updateOutlet(
     }
     throw error;
   }
-}
-
-function parseOutletStatus(value: unknown): OutletVerificationStatus | null {
-  if (typeof value === "string" && editableStatuses.some((status) => status === value)) {
-    return value as OutletVerificationStatus;
-  }
-  return null;
 }

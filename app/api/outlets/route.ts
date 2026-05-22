@@ -1,11 +1,10 @@
-import type { OutletVerificationStatus, Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { normalizeOutletName, numberOrNull } from "@/lib/outlets";
+import { parseOutletVerificationStatus } from "@/lib/outlet-types";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
-
-const outletStatuses = ["VERIFIED", "UNVERIFIED", "REJECTED"] as const;
 
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -13,7 +12,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const status = parseOutletStatus(request.nextUrl.searchParams.get("status"));
+  const status = parseOutletVerificationStatus(request.nextUrl.searchParams.get("status"));
   const where: Prisma.OutletWhereInput = status ? { verificationStatus: status } : {};
   const outlets = await prisma.outlet.findMany({
     where,
@@ -25,29 +24,55 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const session = await auth();
-  if (!session?.user || (session.user.role !== "SUPERVISOR" && session.user.role !== "ADMIN")) {
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const allowedRoles = ["REP", "SUPERVISOR", "ADMIN"];
+  if (!allowedRoles.includes(session.user.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const body = await request.json();
-  const outlet = await prisma.outlet.create({
-    data: {
-      name: body.name,
-      normalizedName: normalizeOutletName(body.name),
-      code: body.code,
-      address: body.address,
-      latitude: numberOrNull(body.latitude),
-      longitude: numberOrNull(body.longitude),
-      verificationStatus: "VERIFIED",
-      verifiedAt: new Date(),
-    },
-  });
-  return NextResponse.json(outlet, { status: 201 });
-}
+  const name = typeof body.name === "string" ? body.name.trim().replace(/\s+/g, " ") : "";
+  const code = typeof body.code === "string" ? body.code.trim().toUpperCase() : "";
 
-function parseOutletStatus(value: string | null): OutletVerificationStatus | null {
-  if (outletStatuses.some((status) => status === value)) {
-    return value as OutletVerificationStatus;
+  if (!name || !code) {
+    return NextResponse.json({ error: "Name and code are required." }, { status: 400 });
   }
-  return null;
+
+  const latitude = numberOrNull(body.latitude);
+  const longitude = numberOrNull(body.longitude);
+
+  if (session.user.role === "REP" && (latitude === null || longitude === null)) {
+    return NextResponse.json(
+      { error: "Store latitude and longitude are required." },
+      { status: 400 },
+    );
+  }
+
+  const isSupervisorOrAdmin =
+    session.user.role === "SUPERVISOR" || session.user.role === "ADMIN";
+
+  try {
+    const outlet = await prisma.outlet.create({
+      data: {
+        name,
+        normalizedName: normalizeOutletName(name),
+        code,
+        address: typeof body.address === "string" ? body.address.trim() || null : null,
+        latitude,
+        longitude,
+        verificationStatus: isSupervisorOrAdmin ? "VERIFIED" : "UNVERIFIED",
+        verifiedAt: isSupervisorOrAdmin ? new Date() : null,
+        createdById: session.user.role === "REP" ? session.user.id : null,
+      },
+    });
+    return NextResponse.json(outlet, { status: 201 });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      return NextResponse.json({ error: `Outlet code "${code}" already exists.` }, { status: 409 });
+    }
+    throw err;
+  }
 }

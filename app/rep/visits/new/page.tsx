@@ -5,10 +5,11 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PhotoUploader, type PhotoFile } from "@/components/photo-uploader";
+import { ShopNameCombobox } from "@/components/shop-name-combobox";
+import type { OutletOption } from "@/components/add-outlet-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -45,6 +46,7 @@ export default function NewVisitPage() {
   const [step, setStep] = useState(0);
   const [shopName, setShopName] = useState("");
   const [selectedOutletId, setSelectedOutletId] = useState("");
+  const [selectedOutlet, setSelectedOutlet] = useState<OutletOption | null>(null);
   const [forceNewOutlet, setForceNewOutlet] = useState(false);
   const [notes, setNotes] = useState("");
   const [gps, setGps] = useState<{ lat: number; lng: number } | null>(null);
@@ -80,8 +82,16 @@ export default function NewVisitPage() {
 
   useEffect(() => {
     setSelectedOutletId("");
+    setSelectedOutlet(null);
     setForceNewOutlet(false);
-  }, [normalizedShopName, gps?.lat, gps?.lng]);
+  }, [gps?.lat, gps?.lng]);
+
+  useEffect(() => {
+    if (selectedOutlet && normalizedShopName === selectedOutlet.name.trim()) return;
+    setSelectedOutletId("");
+    setSelectedOutlet(null);
+    setForceNewOutlet(false);
+  }, [normalizedShopName, selectedOutlet]);
 
   useEffect(() => {
     const updateOnline = () => setIsOnline(navigator.onLine);
@@ -95,11 +105,28 @@ export default function NewVisitPage() {
   }, []);
 
   useEffect(() => {
-    if (outletSearch?.autoMatch) {
+    if (outletSearch?.autoMatch && !selectedOutletId) {
       setSelectedOutletId(outletSearch.autoMatch.id);
+      setShopName(outletSearch.autoMatch.name);
+      setSelectedOutlet({
+        id: outletSearch.autoMatch.id,
+        name: outletSearch.autoMatch.name,
+        code: outletSearch.autoMatch.code,
+        address: outletSearch.autoMatch.address,
+      });
       setForceNewOutlet(false);
     }
-  }, [outletSearch?.autoMatch]);
+  }, [outletSearch?.autoMatch, selectedOutletId]);
+
+  function handleOutletSelect(outlet: OutletOption | null) {
+    setSelectedOutlet(outlet);
+    if (outlet) {
+      setSelectedOutletId(outlet.id);
+      setForceNewOutlet(false);
+    } else {
+      setSelectedOutletId("");
+    }
+  }
 
   function captureGps() {
     setError("");
@@ -168,7 +195,19 @@ export default function NewVisitPage() {
   }
 
   const suggestions = outletSearch?.candidates ?? [];
-  const selectedCandidate = suggestions.find((candidate) => candidate.id === selectedOutletId) ?? null;
+  const selectedCandidate =
+    suggestions.find((candidate) => candidate.id === selectedOutletId) ??
+    (selectedOutlet
+      ? {
+          id: selectedOutlet.id,
+          name: selectedOutlet.name,
+          code: selectedOutlet.code,
+          address: selectedOutlet.address ?? null,
+          distanceMeters: 0,
+          confidence: 1,
+          visitCount: 0,
+        }
+      : null);
   const canCreateImplicitly = Boolean(
     (outletSearch && suggestions.length === 0 && !searchingOutlets) ||
       (!isOnline && normalizedShopName.length >= 2 && gps),
@@ -208,15 +247,16 @@ export default function NewVisitPage() {
               <Label className="text-navy" htmlFor="shopName">
                 Shop Name
               </Label>
-              <Input
-                id="shopName"
-                className="h-12 rounded-2xl bg-[#f9f9ff]"
-                placeholder="e.g. Maa Enterprise, Bhai Bhai Store"
+              <ShopNameCombobox
                 value={shopName}
-                onChange={(event) => setShopName(event.target.value)}
+                selectedOutletId={selectedOutletId}
+                onValueChange={setShopName}
+                onOutletSelect={handleOutletSelect}
+                gps={gps}
+                onLocationCaptured={setGps}
               />
               <p className="text-xs text-muted-foreground">
-                Search is scoped to your current GPS, so suggestions stay near the outlet you are visiting.
+                Pick a store from the list or add a new one. Nearby GPS matching runs when you type a custom name.
               </p>
             </div>
 
@@ -263,26 +303,54 @@ export default function NewVisitPage() {
               </div>
             </div>
 
-            <OutletMatchPanel
-              autoMatch={outletSearch?.autoMatch ?? null}
-              forceNewOutlet={forceNewOutlet}
-              gpsCaptured={Boolean(gps)}
-              isOnline={isOnline}
-              isLoading={searchingOutlets}
-              onCreateNew={() => {
-                setSelectedOutletId("");
-                setForceNewOutlet(true);
-              }}
-              onSelect={(candidateId) => {
-                setSelectedOutletId(candidateId);
-                setForceNewOutlet(false);
-              }}
-              radiusMeters={outletSearch?.radiusMeters ?? 100}
-              searchReady={canSearchOutlets}
-              selectedOutletId={selectedOutletId}
-              shopName={normalizedShopName}
-              suggestions={suggestions}
-            />
+            {!selectedOutletId && (
+              <OutletMatchPanel
+                autoMatch={outletSearch?.autoMatch ?? null}
+                forceNewOutlet={forceNewOutlet}
+                gpsCaptured={Boolean(gps)}
+                isOnline={isOnline}
+                isLoading={searchingOutlets}
+                onCreateNew={() => {
+                  setSelectedOutletId("");
+                  setForceNewOutlet(true);
+                }}
+                onSelect={(candidateId) => {
+                  const candidate = suggestions.find((item) => item.id === candidateId);
+                  if (candidate) {
+                    setShopName(candidate.name);
+                    setSelectedOutlet({
+                      id: candidate.id,
+                      name: candidate.name,
+                      code: candidate.code,
+                      address: candidate.address,
+                    });
+                  }
+                  setSelectedOutletId(candidateId);
+                  setForceNewOutlet(false);
+                }}
+                radiusMeters={outletSearch?.radiusMeters ?? 100}
+                searchReady={canSearchOutlets}
+                selectedOutletId={selectedOutletId}
+                shopName={normalizedShopName}
+                suggestions={suggestions}
+              />
+            )}
+
+            {selectedOutletId && selectedCandidate && (
+              <div className="rounded-2xl border border-teal/30 bg-teal/5 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-teal text-white">
+                    <Store className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-navy">Store selected</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {selectedCandidate.name} ({selectedCandidate.code})
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label className="text-navy">Visit Notes</Label>
