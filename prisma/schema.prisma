@@ -27,14 +27,25 @@ enum OutletVerificationStatus {
   REJECTED
 }
 
+enum OutletSubmissionStatus {
+  AUTO_MATCHED
+  PENDING_REVIEW
+  NEW_OUTLET
+  APPROVED
+  REJECTED
+  MERGED
+}
+
 model User {
-  id           String   @id @default(cuid())
-  name         String
-  email        String   @unique
-  passwordHash String
-  role         Role
-  visits       Visit[]
-  createdAt    DateTime @default(now())
+  id                        String             @id @default(cuid())
+  name                      String
+  email                     String             @unique
+  passwordHash              String
+  role                      Role
+  visits                    Visit[]
+  outletSubmissions         OutletSubmission[] @relation("RepOutletSubmissions")
+  reviewedOutletSubmissions OutletSubmission[] @relation("ReviewedOutletSubmissions")
+  createdAt                 DateTime           @default(now())
 }
 
 model Outlet {
@@ -48,11 +59,57 @@ model Outlet {
   verificationStatus OutletVerificationStatus @default(VERIFIED)
   verifiedAt         DateTime?
   createdByVisitId   String?
+  createdById        String?
+  approvedById       String?
   visits             Visit[]
+  aliases            OutletAlias[]
+  matchedSubmissions OutletSubmission[]       @relation("MatchedOutletSubmissions")
+  createdSubmissions OutletSubmission[]       @relation("CreatedOutletSubmissions")
   createdAt          DateTime                 @default(now())
 
   @@index([normalizedName])
   @@index([verificationStatus, createdAt])
+}
+
+model OutletAlias {
+  id                 String   @id @default(cuid())
+  outletId           String
+  aliasName          String
+  normalizedAlias    String
+  sourceSubmissionId String?
+  outlet             Outlet   @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  createdAt          DateTime @default(now())
+
+  @@unique([outletId, normalizedAlias])
+  @@index([normalizedAlias])
+}
+
+model OutletSubmission {
+  id               String                 @id @default(cuid())
+  repId            String
+  submittedName    String
+  normalizedName   String
+  submittedLat     Float?
+  submittedLng     Float?
+  matchedOutletId  String?
+  createdOutletId  String?
+  visitId          String?
+  matchConfidence  Float?
+  status           OutletSubmissionStatus
+  possibleMatches  Json?
+  reviewedById     String?
+  reviewedAt       DateTime?
+  createdAt        DateTime               @default(now())
+  rep              User                   @relation("RepOutletSubmissions", fields: [repId], references: [id])
+  reviewedBy       User?                  @relation("ReviewedOutletSubmissions", fields: [reviewedById], references: [id])
+  matchedOutlet    Outlet?                @relation("MatchedOutletSubmissions", fields: [matchedOutletId], references: [id])
+  createdOutlet    Outlet?                @relation("CreatedOutletSubmissions", fields: [createdOutletId], references: [id])
+
+  @@index([status, createdAt])
+  @@index([normalizedName])
+  @@index([matchedOutletId])
+  @@index([createdOutletId])
+  @@index([visitId])
 }
 
 model Visit {

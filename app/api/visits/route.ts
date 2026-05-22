@@ -74,10 +74,12 @@ export async function POST(request: NextRequest) {
     const checkInLat = numberOrNull(body.checkInLat);
     const checkInLng = numberOrNull(body.checkInLng);
     const outletResolution = await resolveOutletForVisit({
+      repId: session.user.id,
       outletId: body.outletId,
       outletName: body.outletName,
       checkInLat,
       checkInLng,
+      forceNewOutlet: body.forceNewOutlet,
     });
 
     const visit = await prisma.visit.create({
@@ -105,16 +107,25 @@ export async function POST(request: NextRequest) {
         where: { id: outletResolution.outlet.id },
         data: { createdByVisitId: visit.id },
       });
+    }
+
+    if (outletResolution.outletSubmission) {
+      await prisma.outletSubmission.update({
+        where: { id: outletResolution.outletSubmission.id },
+        data: { visitId: visit.id },
+      });
 
       await prisma.eventLog.create({
         data: {
           visitId: visit.id,
-          event: "OUTLET_AUTO_CREATED",
+          event: "OUTLET_SUBMISSION_RESOLVED",
           level: "info",
           metadata: {
             outletId: outletResolution.outlet.id,
             outletName: outletResolution.outlet.name,
             matchedBy: outletResolution.matchedBy,
+            outletSubmissionId: outletResolution.outletSubmission.id,
+            outletSubmissionStatus: outletResolution.outletSubmission.status,
           },
         },
       });
