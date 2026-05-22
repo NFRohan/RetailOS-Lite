@@ -21,29 +21,29 @@ export default function SupervisorVisitDetailPage() {
   });
 
   if (isLoading) {
-    return <Skeleton className="h-96 w-full rounded-xl" />;
+    return <Skeleton className="h-96 w-full rounded-xl bg-white" />;
   }
 
   if (!visit) {
-    return <p className="text-rose-400">Visit not found</p>;
+    return <p className="text-rose-700">Visit not found</p>;
   }
 
   const outcome = visit.aiResult?.outcomeSummary ?? null;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <Button variant="ghost" size="sm" asChild className="text-white/60 hover:text-white">
-        <Link href="/supervisor">
+    <div className="mx-auto max-w-[1280px] space-y-6">
+      <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-navy">
+        <Link href="/supervisor/visits">
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to dashboard
+          Back to Visit Logs
         </Link>
       </Button>
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">{visit.outlet.name}</h1>
-          <p className="text-sm text-white/50">
-            {visit.outlet.code} · {visit.rep.name} · {formatDate(visit.createdAt)}
+          <h1 className="text-3xl font-bold tracking-tight text-navy">{visit.outlet.name}</h1>
+          <p className="text-sm text-muted-foreground">
+            {visit.outlet.code} / {visit.rep.name} / {formatDate(visit.createdAt)}
           </p>
         </div>
         <VisitStatusBadge status={visit.status} />
@@ -52,8 +52,8 @@ export default function SupervisorVisitDetailPage() {
       {visit.aiResult ? (
         <VisitResultsPanel visit={visit} outcome={outcome} />
       ) : (
-        <div className="rounded-xl border border-white/10 bg-white/5 p-8 text-center text-white/50">
-          {visit.status === "ANALYZING" ? "AI analysis in progress…" : "No analysis results yet"}
+        <div className="rounded-xl border bg-white p-8 text-center text-muted-foreground">
+          {visit.status === "ANALYZING" ? "AI analysis in progress..." : "No analysis results yet"}
         </div>
       )}
     </div>
