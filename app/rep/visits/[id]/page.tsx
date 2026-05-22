@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { AnalyzingPipeline } from "@/components/analyzing-pipeline";
-import { VisitResultsPanel } from "@/components/visit-results-panel";
+import { RepVisitResultsPanel } from "@/components/rep-visit-results-panel";
 import { VisitStatusBadge } from "@/components/visit-status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -102,7 +102,7 @@ export default function RepVisitDetailPage() {
       )}
 
       {(visit.status === "COMPLETE" || visit.status === "FLAGGED") && (
-        <VisitResultsPanel visit={visit} outcome={outcome} />
+        <RepVisitResultsPanel visit={visit} outcome={outcome} />
       )}
     </div>
   );
