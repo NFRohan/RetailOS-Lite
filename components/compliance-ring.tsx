@@ -22,6 +22,7 @@ export function ComplianceRing({ score, status, size = 160 }: Props) {
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (score / 100) * circumference;
+  const isCompact = size <= 120;
 
   const strokeColor =
     status === "excellent" || status === "acceptable"
@@ -56,9 +57,17 @@ export function ComplianceRing({ score, status, size = 160 }: Props) {
           transition={{ duration: 1.2, ease: "easeOut" }}
         />
       </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <motion.span className="text-3xl font-bold tabular-nums">{display}</motion.span>
-        <span className={cn("text-xs font-medium uppercase tracking-wide", complianceColor(status))}>
+      <div className="absolute inset-0 flex flex-col items-center justify-center px-3 text-center leading-none">
+        <motion.span className={cn("font-bold tabular-nums text-navy", isCompact ? "text-2xl" : "text-3xl")}>
+          {display}
+        </motion.span>
+        <span
+          className={cn(
+            "mt-1 max-w-full truncate font-medium uppercase",
+            isCompact ? "text-[10px] tracking-[0.08em]" : "text-xs tracking-wide",
+            complianceColor(status),
+          )}
+        >
           {status}
         </span>
       </div>
