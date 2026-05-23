@@ -152,11 +152,12 @@ export default function NewVisitPage() {
     setSubmitting(true);
     setError("");
     const resolvedOutletId = selectedOutletId || selectedOutlet?.id || undefined;
+    const shouldForceNewOutlet = isOnline && forceNewOutlet && !resolvedOutletId;
     const payload: OfflineVisitPayload = {
       clientVisitId: createClientVisitId(),
       outletName: normalizedShopName,
       outletId: resolvedOutletId,
-      forceNewOutlet: forceNewOutlet && !resolvedOutletId,
+      forceNewOutlet: shouldForceNewOutlet,
       checkInLat: gps?.lat ?? null,
       checkInLng: gps?.lng ?? null,
       clientTimestamp: new Date().toISOString(),
@@ -223,6 +224,13 @@ export default function NewVisitPage() {
   const canContinueFromOutlet = Boolean(
     normalizedShopName.length >= 2 && gps && (selectedOutletId || forceNewOutlet || canCreateImplicitly),
   );
+  const outletMatchReviewLabel = selectedCandidate
+    ? `${selectedCandidate.name} (${Math.round(selectedCandidate.confidence * 100)}%)`
+    : !isOnline
+      ? "Will resolve against master outlet data when synced"
+      : forceNewOutlet
+        ? "New shop pending supervisor review"
+        : "Server will resolve nearest outlet match";
 
   return (
     <div className="space-y-5">
@@ -427,11 +435,7 @@ export default function NewVisitPage() {
                 <ReviewRow label="Shop" value={normalizedShopName || "-"} />
                 <ReviewRow
                   label="Outlet Match"
-                  value={
-                    selectedCandidate
-                      ? `${selectedCandidate.name} (${Math.round(selectedCandidate.confidence * 100)}%)`
-                      : "New shop pending supervisor review"
-                  }
+                  value={outletMatchReviewLabel}
                 />
                 <ReviewRow label="GPS" value={gps ? `${gps.lat.toFixed(5)}, ${gps.lng.toFixed(5)}` : "Not captured"} />
                 <ReviewRow label="Image" value={photos.length > 0 ? "1 shelf image" : "Not uploaded"} />
@@ -526,22 +530,14 @@ function OutletMatchPanel({
           <div className="min-w-0 flex-1">
             <p className="font-semibold text-amber-950">Offline outlet capture</p>
             <p className="mt-1 text-sm text-amber-800">
-              Nearby matching will run when this visit syncs. The outlet may require supervisor verification.
+              Save the typed shop name and GPS now. The server will match it to existing outlet data when this visit syncs.
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          className={cn(
-            "w-full rounded-xl border border-dashed p-3 text-left text-sm transition-colors",
-            forceNewOutlet
-              ? "border-amber-500 bg-white text-amber-950"
-              : "border-amber-300 bg-white/70 text-amber-900 hover:border-amber-500 hover:bg-white",
-          )}
-          onClick={onCreateNew}
-        >
-          Save <span className="font-semibold">{shopName}</span> as an offline pending outlet.
-        </button>
+        <div className="rounded-xl border border-amber-300 bg-white/80 p-3 text-sm text-amber-900">
+          <span className="font-semibold">{shopName}</span> will be queued as an unresolved outlet claim. If no confident
+          nearby match exists during sync, it will become a supervisor-reviewed new outlet.
+        </div>
       </div>
     );
   }

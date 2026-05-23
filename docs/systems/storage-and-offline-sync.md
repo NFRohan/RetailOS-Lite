@@ -121,6 +121,13 @@ Queued record:
 - last error
 - timestamps
 
+Outlet resolution:
+
+- Offline records do not create canonical outlets on-device.
+- The browser stores the typed outlet name, captured GPS, optional selected outlet id, and `forceNewOutlet: false`.
+- When sync resumes, `/api/visits` reruns server-side outlet resolution against the latest master data.
+- Strong matches auto-link existing outlets; ambiguous or unknown shops enter supervisor review.
+
 ## Sync Order
 
 ```text

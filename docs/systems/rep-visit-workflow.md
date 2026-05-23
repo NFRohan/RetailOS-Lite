@@ -75,6 +75,8 @@ Rep enters/searches shop name
 
 `clientVisitId` is an idempotency key. If the same rep retries a previously created visit, the existing visit is returned.
 
+Offline outlet capture is intentionally server-authoritative. When the browser is offline, the client stores the typed outlet name and GPS as an unresolved claim with `forceNewOutlet: false`. During sync, `/api/visits` reruns normal outlet resolution against the current master outlet registry. Only unresolved low-confidence matches become new supervisor-reviewed outlets.
+
 ## Image Upload
 
 The app intentionally allows one image per visit.
@@ -170,4 +172,4 @@ Retry policy:
 
 - The flow does not support multi-image visits.
 - The upload path still streams through the app server; production should prefer direct-to-bucket signed uploads.
-- Offline conflict resolution is intentionally simple: client idempotency, one image, retryable error classification.
+- Offline conflict resolution is intentionally simple: client idempotency, one image, retryable error classification, and server-side outlet resolution on sync.
