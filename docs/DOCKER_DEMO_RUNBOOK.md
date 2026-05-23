@@ -19,6 +19,8 @@ npm run demo:up
 The first AI service build is still the slowest step because it installs the CPU
 vision stack. Later runs should reuse Docker cache unless dependencies change.
 `demo:up` intentionally does not rebuild; this keeps demo restarts fast.
+`demo:build` builds services sequentially and disables Compose Bake to avoid
+Docker Desktop export stalls on Windows.
 
 Detached mode:
 

@@ -27,7 +27,21 @@ FROM deps AS tools
 
 COPY . .
 
-FROM base AS runner
+FROM base AS web-runner
+
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
+
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+
+EXPOSE 3000
+
+CMD ["node", "server.js"]
+
+FROM base AS worker-runner
 
 ENV NODE_ENV=production
 
@@ -38,10 +52,8 @@ RUN npm ci --omit=dev --ignore-scripts \
 
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/client
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
 COPY --from=builder /app/dist-worker ./dist-worker
 
-EXPOSE 3000 9101
+EXPOSE 9101
 
-CMD ["npm", "run", "start"]
+CMD ["node", "dist-worker/index.js"]

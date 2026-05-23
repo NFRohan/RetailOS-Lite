@@ -14,6 +14,7 @@ addRemotePattern(process.env.IMAGE_STORAGE_PUBLIC_BASE_URL);
 addRemotePattern(process.env.S3_ENDPOINT);
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   images: {
     remotePatterns,
   },

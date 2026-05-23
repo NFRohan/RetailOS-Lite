@@ -18,7 +18,7 @@
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
-    "demo:build": "docker compose -f docker-compose.demo.yml build app-init web ai-service",
+    "demo:build": "set COMPOSE_BAKE=false&& docker compose -f docker-compose.demo.yml build ai-service && docker compose -f docker-compose.demo.yml build web && docker compose -f docker-compose.demo.yml build worker && docker compose -f docker-compose.demo.yml build app-init",
     "demo:up": "docker compose -f docker-compose.demo.yml up",
     "demo:up:detached": "docker compose -f docker-compose.demo.yml up -d",
     "demo:down": "docker compose -f docker-compose.demo.yml down",
