@@ -55,6 +55,7 @@ export default function NewVisitPage() {
   const [submitting, setSubmitting] = useState(false);
   const [isOnline, setIsOnline] = useState(() => (typeof navigator === "undefined" ? true : navigator.onLine));
   const [error, setError] = useState("");
+  const [queuedOfflineMessage, setQueuedOfflineMessage] = useState("");
 
   const normalizedShopName = shopName.trim();
   const canSearchOutlets = Boolean(isOnline && normalizedShopName.length >= 2 && gps);
@@ -151,6 +152,7 @@ export default function NewVisitPage() {
   async function handleSubmit() {
     setSubmitting(true);
     setError("");
+    setQueuedOfflineMessage("");
     const resolvedOutletId = selectedOutletId || selectedOutlet?.id || undefined;
     const shouldForceNewOutlet = isOnline && forceNewOutlet && !resolvedOutletId;
     const payload: OfflineVisitPayload = {
@@ -178,7 +180,8 @@ export default function NewVisitPage() {
       if (!isOnline) {
         await queueOfflineVisitSubmission(syncInput);
         await queryClient.invalidateQueries({ queryKey: ["offline-visits"] });
-        router.push("/rep/visits?queued=1");
+        setQueuedOfflineMessage("Saved offline. Keep this tab open or reconnect later; sync will retry automatically.");
+        setSubmitting(false);
         return;
       }
 
@@ -190,7 +193,8 @@ export default function NewVisitPage() {
         try {
           await queueOfflineVisitSubmission(syncInput);
           await queryClient.invalidateQueries({ queryKey: ["offline-visits"] });
-          router.push("/rep/visits?queued=1");
+          setQueuedOfflineMessage("Saved offline after a network failure. Sync will retry automatically when the app is online.");
+          setSubmitting(false);
           return;
         } catch (queueError) {
           setError(queueError instanceof Error ? queueError.message : "Could not save visit offline.");
@@ -383,7 +387,7 @@ export default function NewVisitPage() {
 
             {error && <p className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
 
-            <Button className="h-12 w-full rounded-2xl" disabled={!canContinueFromOutlet} onClick={() => setStep(1)}>
+            <Button type="button" className="h-12 w-full rounded-2xl" disabled={!canContinueFromOutlet} onClick={() => setStep(1)}>
               Continue to Photos
             </Button>
           </CardContent>
@@ -412,10 +416,10 @@ export default function NewVisitPage() {
             <PhotoUploader photos={photos} onChange={setPhotos} />
 
             <div className="grid grid-cols-2 gap-3">
-              <Button variant="outline" className="h-12 rounded-2xl" onClick={() => setStep(0)}>
+              <Button type="button" variant="outline" className="h-12 rounded-2xl" onClick={() => setStep(0)}>
                 Back
               </Button>
-              <Button className="h-12 rounded-2xl" disabled={photos.length === 0} onClick={() => setStep(2)}>
+              <Button type="button" className="h-12 rounded-2xl" disabled={photos.length === 0} onClick={() => setStep(2)}>
                 Review
               </Button>
             </div>
@@ -454,12 +458,22 @@ export default function NewVisitPage() {
             </div>
 
             {error && <p className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
+            {queuedOfflineMessage && (
+              <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
+                {queuedOfflineMessage}
+              </p>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
-              <Button variant="outline" className="h-12 rounded-2xl" onClick={() => setStep(1)} disabled={submitting}>
+              <Button type="button" variant="outline" className="h-12 rounded-2xl" onClick={() => setStep(1)} disabled={submitting}>
                 Back
               </Button>
-              <Button className="h-12 rounded-2xl" onClick={handleSubmit} disabled={submitting}>
+              <Button
+                type="button"
+                className="h-12 rounded-2xl"
+                onClick={handleSubmit}
+                disabled={submitting || Boolean(queuedOfflineMessage)}
+              >
                 {submitting ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
