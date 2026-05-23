@@ -14,7 +14,8 @@ export default function SupervisorDashboardPage() {
   const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ["dashboard", "7d", timeZone],
     queryFn: () => fetch(`/api/dashboard?range=7d&tz=${encodeURIComponent(timeZone)}`).then((r) => r.json()),
-    refetchInterval: 5000,
+    refetchInterval: 15000,
+    refetchIntervalInBackground: false,
   });
 
   if (isLoading) {

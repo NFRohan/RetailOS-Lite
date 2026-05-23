@@ -23,7 +23,8 @@ export default function SupervisorVisitLogsPage() {
   const { data, isLoading } = useQuery<VisitLogsResponse>({
     queryKey: ["visit-logs", deferredQuery, status, page],
     queryFn: () => fetch(visitLogsUrl({ query: deferredQuery, status, page })).then((r) => r.json()),
-    refetchInterval: 5000,
+    refetchInterval: 15000,
+    refetchIntervalInBackground: false,
   });
 
   const visits = data?.items ?? [];

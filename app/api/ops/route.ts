@@ -6,6 +6,12 @@ import { requireApiSession, ROLE_GROUPS } from "@/lib/rbac";
 import { NextResponse } from "next/server";
 
 type EventRow = Prisma.EventLogGetPayload<object>;
+type QueueHealth = Awaited<ReturnType<typeof readQueueHealth>>;
+
+const QUEUE_HEALTH_CACHE_MS = 3000;
+let cachedQueueHealth: { expiresAt: number; value: QueueHealth } | null = null;
+let redisConnection: Redis | null = null;
+let queueClients: Queue[] | null = null;
 
 export async function GET() {
   const authz = await requireApiSession(ROLE_GROUPS.supervisor);
@@ -48,25 +54,29 @@ async function loadEvents() {
 }
 
 async function loadQueueHealth() {
+  const now = Date.now();
+  if (cachedQueueHealth && cachedQueueHealth.expiresAt > now) {
+    return cachedQueueHealth.value;
+  }
+
+  const value = await readQueueHealth();
+  cachedQueueHealth = { expiresAt: now + QUEUE_HEALTH_CACHE_MS, value };
+  return value;
+}
+
+async function readQueueHealth() {
   const redisUrl = process.env.REDIS_URL || "redis://127.0.0.1:6379";
-  const connection = new Redis(redisUrl, {
-    maxRetriesPerRequest: 1,
-    connectTimeout: 750,
-    lazyConnect: true,
-  });
   const analyzeQueueName = process.env.ANALYZE_VISIT_QUEUE || "analyze_visit";
   const embedQueueName = process.env.EMBED_VISIT_REPORT_QUEUE || "embed_visit_report";
   const dlqName = process.env.ANALYZE_VISIT_DLQ || "analyze_visit_dlq";
 
   try {
-    await connection.connect();
-    const queues = [
-      new Queue(analyzeQueueName, { connection }),
-      new Queue(embedQueueName, { connection }),
-      new Queue(dlqName, { connection }),
-    ];
+    const connection = getRedisConnection(redisUrl);
+    if (connection.status === "wait") {
+      await connection.connect();
+    }
+    const queues = getQueueClients(connection, [analyzeQueueName, embedQueueName, dlqName]);
     const [analyze, embed, dlq] = await Promise.all(queues.map(readQueue));
-    await Promise.all(queues.map((queue) => queue.close()));
     return {
       status: "connected",
       queues: [analyze, embed, dlq],
@@ -81,9 +91,27 @@ async function loadQueueHealth() {
         emptyQueue(dlqName),
       ],
     };
-  } finally {
-    await connection.quit().catch(() => undefined);
   }
+}
+
+function getRedisConnection(redisUrl: string) {
+  if (redisConnection) return redisConnection;
+  redisConnection = new Redis(redisUrl, {
+    maxRetriesPerRequest: 1,
+    connectTimeout: 750,
+    lazyConnect: true,
+  });
+  return redisConnection;
+}
+
+function getQueueClients(connection: Redis, queueNames: string[]) {
+  const existingNames = queueClients?.map((queue) => queue.name).join("|");
+  const nextNames = queueNames.join("|");
+  if (queueClients && existingNames === nextNames) return queueClients;
+
+  queueClients?.forEach((queue) => void queue.close().catch(() => undefined));
+  queueClients = queueNames.map((name) => new Queue(name, { connection }));
+  return queueClients;
 }
 
 async function readQueue(queue: Queue) {

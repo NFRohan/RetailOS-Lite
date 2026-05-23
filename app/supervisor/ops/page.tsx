@@ -63,6 +63,7 @@ export default function SupervisorOpsPage() {
     queryKey: ["ops"],
     queryFn: () => fetch("/api/ops").then((response) => response.json()),
     refetchInterval: 5000,
+    refetchIntervalInBackground: false,
   });
 
   if (isLoading || !data) {

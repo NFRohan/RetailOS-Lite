@@ -76,7 +76,8 @@ export default function OutletVerificationPage() {
       if (!response.ok) throw new Error("Could not load outlet review queue.");
       return response.json();
     },
-    refetchInterval: 5000,
+    refetchInterval: 15000,
+    refetchIntervalInBackground: false,
   });
   const { data: masterOutlets = [], isLoading: masterLoading } = useQuery<OutletRecord[]>({
     queryKey: ["outlets-master"],
@@ -85,7 +86,8 @@ export default function OutletVerificationPage() {
       if (!response.ok) throw new Error("Could not load master outlet list.");
       return response.json();
     },
-    refetchInterval: 10000,
+    refetchInterval: 30000,
+    refetchIntervalInBackground: false,
   });
 
   const submissions = data?.submissions ?? [];
