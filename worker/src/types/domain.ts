@@ -45,6 +45,7 @@ export type Visit = {
   clientTimestamp?: string;
   serverCreatedAt?: string;
   notes?: string;
+  repName?: string;
   outlet: Outlet;
   images: VisitImage[];
 };

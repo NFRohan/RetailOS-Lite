@@ -32,5 +32,8 @@ export async function notifyOutletApprovalNeeded(input: NotifyOutletApprovalInpu
 
   if (result.ok) {
     console.info("[outlet-approval-alerts] WhatsApp sent:", result.messageSid);
+    return;
   }
+
+  console.error("[outlet-approval-alerts] WhatsApp send failed:", result.error ?? "unknown error");
 }

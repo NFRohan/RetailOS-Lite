@@ -19,4 +19,5 @@ export type VisitRepository = {
   saveVisitReport(report: VisitReportRecord): Promise<void>;
   getVisitReport(visitId: string): Promise<VisitReportRecord>;
   addEvent(event: EventLogRecord): Promise<void>;
+  hasVisitEvent(visitId: string, event: string): Promise<boolean>;
 };

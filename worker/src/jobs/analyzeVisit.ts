@@ -4,6 +4,7 @@ import type { AIServiceClient } from "../services/aiService.js";
 import { runContextualFraudChecks } from "../services/fraud.js";
 import { buildOutcomeSummary } from "../services/outcomeSummary.js";
 import { buildVisitReport } from "../services/reportBuilder.js";
+import { sendFraudAlert } from "../services/whatsappAlerts.js";
 import type { AnalyzeShelfResponse } from "../types/ai.js";
 import type { AnalyzeVisitJobData, AIResultRecord, Visit } from "../types/domain.js";
 import type { VisitRepository } from "../repositories/visitRepository.js";
@@ -96,6 +97,7 @@ export async function analyzeVisit(
     await repository.saveAIResult(aiResult);
     await repository.saveVisitReport(report);
     await repository.updateVisitStatus(visit.id, finalStatus);
+
     await repository.addEvent({
       visitId: visit.id,
       jobId: job?.id,
@@ -141,6 +143,46 @@ export async function analyzeVisit(
       complianceScore: analysis.compliance.score,
       fraudSignalCount: fraudSignals.length,
     });
+
+    if (fraudSignals.length > 0) {
+      const alertAlreadySent = await repository.hasVisitEvent(visit.id, "WHATSAPP_FRAUD_ALERT_SENT");
+      if (!alertAlreadySent) {
+        const alertResult = await sendFraudAlert({
+          visitId: visit.id,
+          storeName: visit.outlet.name,
+          repName: visit.repName ?? "Unknown rep",
+          complianceScore: analysis.compliance.score,
+          complianceStatus: analysis.compliance.status,
+          fraudSignals,
+        });
+
+        if (alertResult.ok) {
+          await repository.addEvent({
+            visitId: visit.id,
+            jobId: job?.id,
+            event: "WHATSAPP_FRAUD_ALERT_SENT",
+            level: "info",
+            traceId: correlationId,
+            metadata: { messageSid: alertResult.messageSid },
+            createdAt: nowIso(),
+          });
+          logInfo("fraud whatsapp alert sent", {
+            correlationId,
+            visitId: visit.id,
+            messageSid: alertResult.messageSid,
+            stage: "whatsapp_alert",
+            status: "sent",
+          });
+        } else {
+          logError(new Error(alertResult.error ?? "WhatsApp send failed"), "fraud whatsapp alert failed", {
+            correlationId,
+            visitId: visit.id,
+            stage: "whatsapp_alert",
+            status: "failed",
+          });
+        }
+      }
+    }
 
     return aiResult;
   } catch (error) {

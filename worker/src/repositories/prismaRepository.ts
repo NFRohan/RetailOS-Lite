@@ -16,7 +16,7 @@ export class PrismaVisitRepository implements VisitRepository {
   async getVisitForAnalysis(visitId: string): Promise<Visit> {
     const visit = await this.prisma.visit.findUnique({
       where: { id: visitId },
-      include: { outlet: true, images: true },
+      include: { outlet: true, images: true, rep: { select: { name: true } } },
     });
     if (!visit) throw new Error(`Visit not found: ${visitId}`);
     if (visit.images.length === 0) throw new Error(`Visit has no images: ${visitId}`);
@@ -31,6 +31,7 @@ export class PrismaVisitRepository implements VisitRepository {
       clientTimestamp: visit.clientTimestamp?.toISOString(),
       serverCreatedAt: visit.createdAt.toISOString(),
       notes: visit.notes ?? undefined,
+      repName: visit.rep.name,
       outlet: {
         id: visit.outlet.id,
         name: visit.outlet.name,
@@ -211,6 +212,13 @@ export class PrismaVisitRepository implements VisitRepository {
         createdAt: new Date(event.createdAt),
       },
     });
+  }
+
+  async hasVisitEvent(visitId: string, event: string): Promise<boolean> {
+    const count = await this.prisma.eventLog.count({
+      where: { visitId, event },
+    });
+    return count > 0;
   }
 }
 

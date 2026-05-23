@@ -122,6 +122,11 @@ export class JsonVisitRepository implements VisitRepository {
     });
   }
 
+  async hasVisitEvent(visitId: string, event: string): Promise<boolean> {
+    const db = await this.read();
+    return db.eventLog.some((entry) => entry.visitId === visitId && entry.event === event);
+  }
+
   private async read(): Promise<JsonDb> {
     try {
       const raw = await fs.readFile(this.filePath, "utf8");

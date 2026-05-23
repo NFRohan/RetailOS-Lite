@@ -17,6 +17,8 @@
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
+    "test:whatsapp": "tsx scripts/test-whatsapp-alert.ts",
+    "test:whatsapp:fraud": "tsx scripts/test-fraud-whatsapp-alert.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
