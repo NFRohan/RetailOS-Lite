@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState, useTransition } from "react";
+import { FormEvent, useEffect, useState, useTransition, type KeyboardEvent } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -48,6 +48,7 @@ export function AssistantChat() {
     if (!trimmed || isPending) return;
 
     setMessages((current) => [...current, { role: "user", content: trimmed }]);
+    setQuestion("");
     startTransition(async () => {
       const response = await fetch("/api/assistant/query", {
         method: "POST",
@@ -165,6 +166,12 @@ export function AssistantChat() {
               <Textarea
                 value={question}
                 onChange={(event) => setQuestion(event.target.value)}
+                onKeyDown={(event: KeyboardEvent<HTMLTextAreaElement>) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    askAssistant();
+                  }
+                }}
                 placeholder="Ask about failing outlets, POSM gaps, fraud signals..."
                 className="min-h-20 flex-1 resize-none border-[#c1c7cc] bg-white focus-visible:ring-teal/30"
               />
@@ -191,7 +198,7 @@ export function AssistantChat() {
             <p className="mt-1">Visit report text is embedded with OpenAI and searched in Pinecone for similar cases.</p>
           </div>
           <div className="rounded-xl bg-amber-50 p-4 text-amber-900">
-            <p className="font-semibold">Demo-safe behavior</p>
+            <p className="font-semibold">Resilient fallback</p>
             <p className="mt-1">If the AI service is offline, the API returns a deterministic database fallback answer.</p>
           </div>
         </CardContent>

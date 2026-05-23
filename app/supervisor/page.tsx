@@ -80,16 +80,13 @@ export default function SupervisorDashboardPage() {
       </section>
 
       <Card className="overflow-hidden border-[#d6ddea] bg-white shadow-[0_1px_3px_rgba(2,43,58,0.05)]">
-        <CardHeader className="flex flex-row items-center justify-between border-b bg-white p-6">
+        <CardHeader className="border-b bg-white p-6">
           <div>
             <CardTitle className="text-xl text-navy">Recent Visits</CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">
               Focusing on Olympic visibility, POSM, compliance, and fraud review reasons.
             </p>
           </div>
-          <button className="rounded-lg border border-[#c1c7cc] px-3 py-2 text-xs font-semibold text-navy transition-colors hover:border-teal hover:bg-[#e9f7fb]">
-            Filter
-          </button>
         </CardHeader>
         <CardContent className="p-0">
           <VisitTable visits={recentVisits} />
@@ -211,7 +208,7 @@ function PerformanceTrendCard({
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Clean visit rate</p>
             <p className="text-4xl font-bold text-navy">{score}%</p>
             <p className="mt-1 max-w-48 text-xs text-muted-foreground">
-              Clean means no fraud, POSM present, and AI compliance at least 70%.
+              No fraud, POSM present, and Compliance at least 70%.
             </p>
           </div>
           <div className="flex h-14 flex-1 items-end gap-1">

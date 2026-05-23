@@ -56,20 +56,7 @@ export function VisitResultsPanel({ visit, outcome }: Props) {
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
       <div className="space-y-6">
         <Card className="border-[#d6ddea] bg-white shadow-[0_1px_3px_rgba(2,43,58,0.05)]">
-          <CardHeader className="flex flex-row items-center justify-between pb-3">
-            <CardTitle className="text-base text-navy">Visual Analysis</CardTitle>
-            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              <span className="inline-flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-rose-500" />
-                Fraud Risk
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-teal" />
-                AI Processed
-              </span>
-            </div>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="p-5">
             <ImageCompareSlider rawUrl={rawUrl} overlayUrl={overlayUrl} />
           </CardContent>
         </Card>
@@ -110,10 +97,9 @@ export function VisitResultsPanel({ visit, outcome }: Props) {
             <PackageCheck className="h-4 w-4 text-teal" />
             <CardTitle className="text-base text-navy">POSM Details</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-2">
+          <CardContent className="grid gap-3">
             <PosmDetail label="Olympic POSM" present={outcome?.posm.detected === true} />
-            <PosmDetail label="Shelf Evidence" present={outcome?.posm.detected === true} />
-            <p className="md:col-span-2 text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               {outcome?.posm.evidence ?? "POSM analysis not available."}
             </p>
           </CardContent>

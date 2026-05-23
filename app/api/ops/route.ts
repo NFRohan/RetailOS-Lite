@@ -43,7 +43,7 @@ export async function GET() {
     failures,
     timelines,
     assistant: assistantStats(events),
-    latency: latencyStats(events),
+    latency: latencyStats(events, timelines),
   });
 }
 
@@ -200,7 +200,13 @@ function assistantStats(events: EventRow[]) {
   };
 }
 
-function latencyStats(events: EventRow[]) {
+function latencyStats(
+  events: EventRow[],
+  timelines: Array<{ durationMs: number | null }>,
+) {
+  const workflowDurations = timelines
+    .map((timeline) => timeline.durationMs)
+    .filter((duration): duration is number => typeof duration === "number" && Number.isFinite(duration));
   const samples = events
     .map((event) => {
       const metadata = isRecord(event.metadata) ? event.metadata : {};
@@ -218,8 +224,8 @@ function latencyStats(events: EventRow[]) {
   }
 
   return {
-    averageMs: average(samples.map((sample) => sample.latencyMs)),
-    sampleCount: samples.length,
+    averageMs: average(workflowDurations),
+    sampleCount: workflowDurations.length,
     byStage: [...byStage.entries()]
       .map(([stage, values]) => ({
         stage,

@@ -32,7 +32,8 @@ export function VisitTable({ visits, basePath = "/supervisor/visits" }: Props) {
             <th className="px-4 py-3">Timestamp</th>
             <th className="px-4 py-3">AI Compliance</th>
             <th className="px-4 py-3">Review Status</th>
-            <th className="px-4 py-3 text-right">Action</th>
+            <th className="px-4 py-3">Issue</th>
+            <th className="px-4 py-3 text-right">Report</th>
           </tr>
         </thead>
         <tbody>
@@ -56,7 +57,10 @@ export function VisitTable({ visits, basePath = "/supervisor/visits" }: Props) {
                 <ComplianceBadge score={visit.complianceScore} status={visit.complianceStatus} />
               </td>
               <td className="px-4 py-3">
-                <ReviewStatus visit={visit} />
+                <ReviewStatusBadge visit={visit} />
+              </td>
+              <td className="px-4 py-3">
+                <ReviewIssue visit={visit} />
               </td>
               <td className="px-4 py-3 text-right">
                 <Link
@@ -74,43 +78,48 @@ export function VisitTable({ visits, basePath = "/supervisor/visits" }: Props) {
   );
 }
 
-function ReviewStatus({ visit }: { visit: VisitListItem }) {
-  const primaryReason = visit.reviewReasons[0];
-
+function ReviewStatusBadge({ visit }: { visit: VisitListItem }) {
   if (visit.riskStatus === "HIGH_RISK") {
     return (
-      <div className="space-y-1">
-        <Badge variant="critical" className="gap-1">
-          <ShieldAlert className="h-3.5 w-3.5" />
-          High Risk
-        </Badge>
-        {primaryReason && <p className="max-w-64 text-xs text-muted-foreground">{primaryReason}</p>}
-      </div>
+      <Badge variant="critical" className="gap-1">
+        <ShieldAlert className="h-3.5 w-3.5" />
+        High Risk
+      </Badge>
     );
   }
 
   if (visit.riskStatus === "REVIEW_NEEDED" || visit.fraudCount > 0) {
     return (
-      <div className="space-y-1">
-        <Badge variant="warning" className="gap-1">
-          <AlertTriangle className="h-3.5 w-3.5" />
-          Review Needed
-        </Badge>
-        <p className="max-w-64 text-xs text-muted-foreground">
-          {primaryReason ?? "Supervisor review required"}
-          {visit.fraudCount === 0 ? " • No fraud signals" : ""}
-        </p>
-      </div>
+      <Badge variant="warning" className="gap-1">
+        <AlertTriangle className="h-3.5 w-3.5" />
+        Review Needed
+      </Badge>
     );
   }
 
   return (
-    <div className="space-y-1">
-      <Badge variant="success" className="gap-1">
-        <CheckCircle2 className="h-3.5 w-3.5" />
-        Clean
-      </Badge>
-      <p className="max-w-64 text-xs text-muted-foreground">No review reasons</p>
-    </div>
+    <Badge variant="success" className="gap-1">
+      <CheckCircle2 className="h-3.5 w-3.5" />
+      Clean
+    </Badge>
   );
+}
+
+function ReviewIssue({ visit }: { visit: VisitListItem }) {
+  const primaryReason = visit.reviewReasons[0];
+
+  if (visit.riskStatus === "HIGH_RISK") {
+    return <p className="max-w-72 text-xs text-muted-foreground">{primaryReason ?? "High-risk fraud signal"}</p>;
+  }
+
+  if (visit.riskStatus === "REVIEW_NEEDED" || visit.fraudCount > 0) {
+    return (
+      <p className="max-w-72 text-xs text-muted-foreground">
+        {primaryReason ?? "Supervisor review required"}
+        {visit.fraudCount === 0 ? " / No fraud signals" : ""}
+      </p>
+    );
+  }
+
+  return <p className="max-w-72 text-xs text-muted-foreground">No review reasons</p>;
 }

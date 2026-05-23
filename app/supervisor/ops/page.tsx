@@ -263,11 +263,11 @@ function LatencyChip({ latency }: { latency: OpsData["latency"] }) {
   const topStages = latency.byStage.slice(0, 3);
   return (
     <div className="flex w-fit flex-wrap items-center gap-2 rounded-full border border-[#d6ddea] bg-white px-3 py-1.5 text-xs shadow-sm">
-      <span className="font-semibold uppercase tracking-wide text-muted-foreground">Avg latency</span>
+      <span className="font-semibold uppercase tracking-wide text-muted-foreground">Workflow avg</span>
       <span className="font-mono text-sm font-bold tabular-nums text-navy">
         {latency.averageMs === null ? "N/A" : formatMs(latency.averageMs)}
       </span>
-      <span className="text-muted-foreground">/{latency.sampleCount} samples</span>
+      <span className="text-muted-foreground">/{latency.sampleCount} visits</span>
       {topStages.length > 0 && <span className="hidden h-4 w-px bg-[#d6ddea] sm:inline-block" />}
       {topStages.map((stage) => (
         <span key={stage.stage} className="hidden items-center gap-1 rounded-full bg-[#eef2fb] px-2 py-0.5 text-muted-foreground sm:inline-flex">
