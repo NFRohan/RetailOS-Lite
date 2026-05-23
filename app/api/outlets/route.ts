@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import type { NextRequest } from "next/server";
+import { notifyOutletApprovalNeeded } from "@/lib/outlet-approval-alerts";
 import { normalizeOutletName, numberOrNull } from "@/lib/outlets";
 import { parseOutletVerificationStatus } from "@/lib/outlet-types";
 import { prisma } from "@/lib/prisma";
@@ -60,6 +61,13 @@ export async function POST(request: NextRequest) {
         createdById: session.user.role === "REP" ? session.user.id : null,
       },
     });
+
+    if (session.user.role === "REP") {
+      void notifyOutletApprovalNeeded({ repId: session.user.id, storeName: name }).catch((error) => {
+        console.error("[outlet-approval-alerts] Failed:", error);
+      });
+    }
+
     return NextResponse.json(outlet, { status: 201 });
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {

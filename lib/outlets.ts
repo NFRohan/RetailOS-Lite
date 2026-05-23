@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Prisma, type Outlet, type OutletSubmission } from "@prisma/client";
+import { notifyOutletApprovalNeeded } from "@/lib/outlet-approval-alerts";
 import { prisma } from "@/lib/prisma";
 
 const AUTO_OUTLET_CODE_PREFIX = "AUTO";
@@ -186,6 +187,8 @@ export async function submitOutletSelection({
 
     if (submission.status === "AUTO_MATCHED") {
       await createOutletAlias(selectedOutlet.id, name, submission.id);
+    } else if (submission.status === "PENDING_REVIEW") {
+      queueOutletApprovalAlert(repId, name, submission.status);
     }
 
     return {
@@ -242,6 +245,10 @@ export async function submitOutletSelection({
       possibleMatches: toPossibleMatchesJson(possibleMatches?.candidates ?? []),
     },
   });
+
+  if (submission.status === "NEW_OUTLET" || submission.status === "PENDING_REVIEW") {
+    queueOutletApprovalAlert(repId, name, submission.status);
+  }
 
   return { outlet, outletSubmission: submission, created: true, matchedBy: "new_outlet" };
 }
@@ -611,4 +618,14 @@ function roundScore(value: number): number {
 
 function stringOrNull(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function queueOutletApprovalAlert(
+  repId: string,
+  storeName: string,
+  submissionStatus: "NEW_OUTLET" | "PENDING_REVIEW",
+) {
+  void notifyOutletApprovalNeeded({ repId, storeName, submissionStatus }).catch((error) => {
+    console.error("[outlet-approval-alerts] Failed:", error);
+  });
 }
