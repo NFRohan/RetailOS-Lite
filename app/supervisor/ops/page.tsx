@@ -43,6 +43,15 @@ type OpsData = {
     events: OpsEvent[];
   }>;
   assistant: { recentQueries: number; lastEventAt: string | null };
+  latency: {
+    averageMs: number | null;
+    sampleCount: number;
+    byStage: Array<{
+      stage: string;
+      averageMs: number | null;
+      sampleCount: number;
+    }>;
+  };
 };
 
 type OpsEvent = {
@@ -94,10 +103,13 @@ export default function SupervisorOpsPage() {
             Queue health, async AI timelines, failures, and telemetry signals for RetailOS workflows.
           </p>
         </div>
-        <Badge variant={data.workerHealth.status === "healthy" ? "success" : "warning"} className="w-fit gap-2 px-3 py-1">
-          <RadioTower className="h-3.5 w-3.5" />
-          {data.workerHealth.status}: {data.workerHealth.reason}
-        </Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          <LatencyChip latency={data.latency} />
+          <Badge variant={data.workerHealth.status === "healthy" ? "success" : "warning"} className="w-fit gap-2 px-3 py-1">
+            <RadioTower className="h-3.5 w-3.5" />
+            {data.workerHealth.status}: {data.workerHealth.reason}
+          </Badge>
+        </div>
       </div>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -245,6 +257,25 @@ function OpsStat({ icon: Icon, label, value, helper, intent = "default" }: { ico
 
 function queueLabel(queue: OpsData["queueHealth"]["queues"][number] | undefined) {
   return `${queue?.counts.waiting ?? 0} / ${queue?.counts.active ?? 0}`;
+}
+
+function LatencyChip({ latency }: { latency: OpsData["latency"] }) {
+  const topStages = latency.byStage.slice(0, 3);
+  return (
+    <div className="flex w-fit flex-wrap items-center gap-2 rounded-full border border-[#d6ddea] bg-white px-3 py-1.5 text-xs shadow-sm">
+      <span className="font-semibold uppercase tracking-wide text-muted-foreground">Avg latency</span>
+      <span className="font-mono text-sm font-bold tabular-nums text-navy">
+        {latency.averageMs === null ? "N/A" : formatMs(latency.averageMs)}
+      </span>
+      <span className="text-muted-foreground">/{latency.sampleCount} samples</span>
+      {topStages.length > 0 && <span className="hidden h-4 w-px bg-[#d6ddea] sm:inline-block" />}
+      {topStages.map((stage) => (
+        <span key={stage.stage} className="hidden items-center gap-1 rounded-full bg-[#eef2fb] px-2 py-0.5 text-muted-foreground sm:inline-flex">
+          {stage.stage}: <strong className="font-mono text-navy">{stage.averageMs === null ? "N/A" : formatMs(stage.averageMs)}</strong>
+        </span>
+      ))}
+    </div>
+  );
 }
 
 function StageBadge({ stage, level }: { stage: string; level: string }) {

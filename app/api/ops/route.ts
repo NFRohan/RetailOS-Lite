@@ -43,6 +43,7 @@ export async function GET() {
     failures,
     timelines,
     assistant: assistantStats(events),
+    latency: latencyStats(events),
   });
 }
 
@@ -199,6 +200,36 @@ function assistantStats(events: EventRow[]) {
   };
 }
 
+function latencyStats(events: EventRow[]) {
+  const samples = events
+    .map((event) => {
+      const metadata = isRecord(event.metadata) ? event.metadata : {};
+      const latencyMs = numberField(metadata.latencyMs) ?? numberField(metadata.durationMs);
+      if (latencyMs === null) return null;
+      return {
+        stage: stringField(metadata.stage) ?? stageFromEvent(event.event),
+        latencyMs,
+      };
+    })
+    .filter((sample): sample is { stage: string; latencyMs: number } => Boolean(sample));
+  const byStage = new Map<string, number[]>();
+  for (const sample of samples) {
+    byStage.set(sample.stage, [...(byStage.get(sample.stage) ?? []), sample.latencyMs]);
+  }
+
+  return {
+    averageMs: average(samples.map((sample) => sample.latencyMs)),
+    sampleCount: samples.length,
+    byStage: [...byStage.entries()]
+      .map(([stage, values]) => ({
+        stage,
+        averageMs: average(values),
+        sampleCount: values.length,
+      }))
+      .sort((a, b) => b.sampleCount - a.sampleCount || a.stage.localeCompare(b.stage)),
+  };
+}
+
 function stageFromEvent(event: string): string {
   if (event.includes("UPLOAD")) return "upload";
   if (event.includes("QUEUED") || event.includes("SUBMITTED")) return "queue";
@@ -220,4 +251,9 @@ function numberField(value: unknown): number | null {
 
 function stringField(value: unknown): string | null {
   return typeof value === "string" && value ? value : null;
+}
+
+function average(values: number[]): number | null {
+  if (values.length === 0) return null;
+  return Math.round(values.reduce((total, value) => total + value, 0) / values.length);
 }
