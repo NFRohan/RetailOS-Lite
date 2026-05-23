@@ -53,7 +53,7 @@ export default function NewVisitPage() {
   const [gpsLoading, setGpsLoading] = useState(false);
   const [photos, setPhotos] = useState<PhotoFile[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const [isOnline, setIsOnline] = useState(true);
+  const [isOnline, setIsOnline] = useState(() => (typeof navigator === "undefined" ? true : navigator.onLine));
   const [error, setError] = useState("");
 
   const normalizedShopName = shopName.trim();
@@ -174,6 +174,13 @@ export default function NewVisitPage() {
     };
 
     try {
+      if (!isOnline) {
+        await queueOfflineVisitSubmission(syncInput);
+        await queryClient.invalidateQueries({ queryKey: ["offline-visits"] });
+        router.push("/rep/visits?queued=1");
+        return;
+      }
+
       const result = await submitMutation.mutateAsync(syncInput);
       await queryClient.invalidateQueries({ queryKey: ["visits"] });
       router.push(`/rep/visits/${result.visitId}`);
@@ -255,9 +262,12 @@ export default function NewVisitPage() {
                 onOutletSelect={handleOutletSelect}
                 gps={gps}
                 onLocationCaptured={setGps}
+                isOnline={isOnline}
               />
               <p className="text-xs text-muted-foreground">
-                Pick a store from the list or add a new one. Nearby GPS matching runs when you type a custom name.
+                {isOnline
+                  ? "Pick a store from the list or type a new one. Nearby GPS matching runs as you type."
+                  : "Offline: type the shop name manually. Matching and supervisor verification run when the visit syncs."}
               </p>
             </div>
 

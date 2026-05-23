@@ -48,7 +48,7 @@ export function useOfflineVisitQueue() {
 export function useOfflineVisitSync(options: Options = {}) {
   const queryClient = useQueryClient();
   const queueQuery = useOfflineVisitQueue();
-  const [isOnline, setIsOnline] = useState(true);
+  const [isOnline, setIsOnline] = useState(() => (typeof navigator === "undefined" ? true : navigator.onLine));
 
   useEffect(() => {
     const updateOnline = () => setIsOnline(navigator.onLine);

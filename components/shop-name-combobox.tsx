@@ -16,6 +16,7 @@ type Props = {
   onOutletSelect: (outlet: OutletOption | null) => void;
   gps?: Location | null;
   onLocationCaptured?: (location: Location) => void;
+  isOnline?: boolean;
   disabled?: boolean;
 };
 
@@ -37,6 +38,7 @@ export function ShopNameCombobox({
   onOutletSelect,
   gps,
   onLocationCaptured,
+  isOnline = true,
   disabled,
 }: Props) {
   const queryClient = useQueryClient();
@@ -47,6 +49,8 @@ export function ShopNameCombobox({
   const { data: outlets = [] } = useQuery<OutletOption[]>({
     queryKey: ["outlets"],
     queryFn: () => fetch("/api/outlets").then((r) => r.json()),
+    enabled: isOnline,
+    retry: false,
   });
 
   const filtered = useMemo(() => {
@@ -100,7 +104,7 @@ export function ShopNameCombobox({
     setAddOpen(false);
   }
 
-  const showDropdown = open && !disabled;
+  const showDropdown = open && !disabled && isOnline;
 
   return (
     <>
@@ -173,7 +177,7 @@ export function ShopNameCombobox({
       </div>
 
       <AddOutletDialog
-        open={addOpen}
+        open={addOpen && isOnline}
         onOpenChange={setAddOpen}
         defaultName={value.trim()}
         gps={gps}
