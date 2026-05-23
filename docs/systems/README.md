@@ -2,6 +2,8 @@
 
 This directory is the subsystem-level handoff pack for RetailOS Lite. It is intended for senior engineers reviewing architecture, boundaries, operational behavior, and demo readiness.
 
+For the live assessment script, use the [Showcase Demo Runbook](../SHOWCASE_DEMO_RUNBOOK.md).
+
 ## Reading Order
 
 | Doc | Scope |
