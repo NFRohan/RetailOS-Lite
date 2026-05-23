@@ -3,6 +3,7 @@ import hmac
 from fastapi import FastAPI, File, Form, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.responses import Response as FastApiResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import config
@@ -10,6 +11,7 @@ from .compliance import build_supervisor_summary, evaluate_compliance
 from .image_io import download_image, ensure_image_path, save_upload
 from .llm_analysis import analyze_retail_image
 from .logging_utils import log_event, request_logging_middleware
+from .observability import capture_exception, init_sentry, metrics_response, observe_latency, yolo_latency
 from .rag import RagConfigurationError, index_visit_report, query_assistant
 from .schemas import (
     AssistantQueryRequest,
@@ -25,6 +27,8 @@ from .schemas import (
 from .yolo_backend import RemoteYoloError, run_yolo_analysis
 from .yolo_detector import get_detector, model_loaded
 
+
+init_sentry()
 
 app = FastAPI(
     title="RetailOS Lite AI Service",
@@ -108,15 +112,32 @@ def model_info():
     }
 
 
+@app.get("/metrics")
+def prometheus_metrics():
+    content, content_type = metrics_response()
+    return FastApiResponse(content=content, media_type=content_type)
+
+
 @app.post("/detect-yolo", response_model=YoloResponse)
 def detect_yolo(payload: YoloDetectRequest) -> YoloResponse:
     try:
         image_path = resolve_request_image(payload)
 
-        return run_yolo_analysis(image_path=image_path, payload=payload)
+        with observe_latency(
+            yolo_latency,
+            (config.YOLO_BACKEND,),
+            "yolo_detection_completed",
+            visitId=payload.visit_id,
+            stage="yolo",
+            inferenceType=config.YOLO_BACKEND,
+            model=config.MODEL_NAME,
+        ):
+            return run_yolo_analysis(image_path=image_path, payload=payload)
     except (FileNotFoundError, ValueError) as error:
+        capture_exception(error, stage="yolo", visit_id=payload.visit_id, model=config.MODEL_NAME, inference_type=config.YOLO_BACKEND)
         raise HTTPException(status_code=400, detail=str(error)) from error
     except RemoteYoloError as error:
+        capture_exception(error, stage="yolo", visit_id=payload.visit_id, model=config.MODEL_NAME, inference_type=config.YOLO_BACKEND)
         raise HTTPException(status_code=502, detail=str(error)) from error
 
 
@@ -129,8 +150,18 @@ def analyze_shelf(payload: YoloDetectRequest) -> ShelfAnalysisResponse:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
     try:
-        yolo = run_yolo_analysis(image_path=image_path, payload=payload)
+        with observe_latency(
+            yolo_latency,
+            (config.YOLO_BACKEND,),
+            "yolo_detection_completed",
+            visitId=payload.visit_id,
+            stage="yolo",
+            inferenceType=config.YOLO_BACKEND,
+            model=config.MODEL_NAME,
+        ):
+            yolo = run_yolo_analysis(image_path=image_path, payload=payload)
     except RemoteYoloError as error:
+        capture_exception(error, stage="yolo", visit_id=payload.visit_id, model=config.MODEL_NAME, inference_type=config.YOLO_BACKEND)
         raise HTTPException(status_code=502, detail=str(error)) from error
     llm = None
     if payload.use_llm:
@@ -143,6 +174,7 @@ def analyze_shelf(payload: YoloDetectRequest) -> ShelfAnalysisResponse:
             )
         except Exception as error:
             warnings.append("LLM analysis failed; using YOLO-only compliance fallback.")
+            capture_exception(error, stage="openai_posm", visit_id=payload.visit_id, model=config.LLM_MODEL, inference_type="vision")
             log_event(
                 "llm_analysis_failed",
                 visitId=payload.visit_id,
@@ -166,14 +198,22 @@ def rag_index_report(payload: VisitReportIndexRequest) -> VisitReportIndexRespon
     try:
         return index_visit_report(payload)
     except RagConfigurationError as error:
+        capture_exception(error, stage="embedding", visit_id=payload.visit_id, model=config.EMBEDDING_MODEL, inference_type="embedding")
         raise HTTPException(status_code=503, detail=str(error)) from error
+    except Exception as error:
+        capture_exception(error, stage="embedding", visit_id=payload.visit_id, model=config.EMBEDDING_MODEL, inference_type="embedding")
+        raise
 
 
 @app.post("/assistant/query", response_model=AssistantQueryResponse)
 def assistant_query(payload: AssistantQueryRequest) -> AssistantQueryResponse:
     if not payload.question.strip():
         raise HTTPException(status_code=400, detail="question is required")
-    return query_assistant(payload)
+    try:
+        return query_assistant(payload)
+    except Exception as error:
+        capture_exception(error, stage="assistant", model=config.CHAT_MODEL, inference_type="rag_query")
+        raise
 
 
 def resolve_request_image(payload: YoloDetectRequest):
@@ -201,8 +241,19 @@ def detect_yolo_upload(
             imageSize=image_size,
             saveOverlay=save_overlay,
         )
-        return run_yolo_analysis(image_path=image_path, payload=payload)
+        with observe_latency(
+            yolo_latency,
+            (config.YOLO_BACKEND,),
+            "yolo_upload_detection_completed",
+            visitId=visit_id,
+            stage="yolo",
+            inferenceType=config.YOLO_BACKEND,
+            model=config.MODEL_NAME,
+        ):
+            return run_yolo_analysis(image_path=image_path, payload=payload)
     except ValueError as error:
+        capture_exception(error, stage="yolo", visit_id=visit_id, model=config.MODEL_NAME, inference_type=config.YOLO_BACKEND)
         raise HTTPException(status_code=400, detail=str(error)) from error
     except RemoteYoloError as error:
+        capture_exception(error, stage="yolo", visit_id=visit_id, model=config.MODEL_NAME, inference_type=config.YOLO_BACKEND)
         raise HTTPException(status_code=502, detail=str(error)) from error

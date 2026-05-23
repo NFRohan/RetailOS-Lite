@@ -1,0 +1,195 @@
+import type { Prisma } from "@prisma/client";
+import { Queue } from "bullmq";
+import { Redis } from "ioredis";
+import { prisma } from "@/lib/prisma";
+import { requireApiSession, ROLE_GROUPS } from "@/lib/rbac";
+import { NextResponse } from "next/server";
+
+type EventRow = Prisma.EventLogGetPayload<object>;
+
+export async function GET() {
+  const authz = await requireApiSession(ROLE_GROUPS.supervisor);
+  if (!authz.ok) return authz.response;
+
+  const [events, queueHealth] = await Promise.all([loadEvents(), loadQueueHealth()]);
+  const visitIds = [...new Set(events.map((event) => event.visitId).filter((id): id is string => Boolean(id)))].slice(0, 30);
+  const visits = await prisma.visit.findMany({
+    where: { id: { in: visitIds } },
+    include: {
+      outlet: true,
+      rep: { select: { name: true } },
+      aiResult: true,
+      fraudSignals: true,
+    },
+  });
+  const visitMap = new Map(visits.map((visit) => [visit.id, visit]));
+  const timelines = buildTimelines(events, visitMap);
+  const failures = events
+    .filter((event) => event.level === "error" || event.event.includes("FAILED"))
+    .slice(0, 10)
+    .map((event) => serializeEvent(event, visitMap));
+
+  return NextResponse.json({
+    generatedAt: new Date().toISOString(),
+    queueHealth,
+    workerHealth: workerHealth(queueHealth),
+    recentEvents: events.slice(0, 30).map((event) => serializeEvent(event, visitMap)),
+    failures,
+    timelines,
+    assistant: assistantStats(events),
+  });
+}
+
+async function loadEvents() {
+  return prisma.eventLog.findMany({
+    orderBy: { createdAt: "desc" },
+    take: 150,
+  });
+}
+
+async function loadQueueHealth() {
+  const redisUrl = process.env.REDIS_URL || "redis://127.0.0.1:6379";
+  const connection = new Redis(redisUrl, {
+    maxRetriesPerRequest: 1,
+    connectTimeout: 750,
+    lazyConnect: true,
+  });
+  const analyzeQueueName = process.env.ANALYZE_VISIT_QUEUE || "analyze_visit";
+  const embedQueueName = process.env.EMBED_VISIT_REPORT_QUEUE || "embed_visit_report";
+  const dlqName = process.env.ANALYZE_VISIT_DLQ || "analyze_visit_dlq";
+
+  try {
+    await connection.connect();
+    const queues = [
+      new Queue(analyzeQueueName, { connection }),
+      new Queue(embedQueueName, { connection }),
+      new Queue(dlqName, { connection }),
+    ];
+    const [analyze, embed, dlq] = await Promise.all(queues.map(readQueue));
+    await Promise.all(queues.map((queue) => queue.close()));
+    return {
+      status: "connected",
+      queues: [analyze, embed, dlq],
+    };
+  } catch (error) {
+    return {
+      status: "unavailable",
+      error: error instanceof Error ? error.message : String(error),
+      queues: [
+        emptyQueue(analyzeQueueName),
+        emptyQueue(embedQueueName),
+        emptyQueue(dlqName),
+      ],
+    };
+  } finally {
+    await connection.quit().catch(() => undefined);
+  }
+}
+
+async function readQueue(queue: Queue) {
+  const counts = await queue.getJobCounts("waiting", "active", "delayed", "failed", "completed");
+  const failedJobs = await queue.getFailed(0, 4);
+  return {
+    name: queue.name,
+    counts,
+    failedJobs: failedJobs.map((job) => ({
+      id: job.id,
+      name: job.name,
+      failedReason: job.failedReason,
+      attemptsMade: job.attemptsMade,
+      data: job.data,
+    })),
+  };
+}
+
+function emptyQueue(name: string) {
+  return {
+    name,
+    counts: { waiting: 0, active: 0, delayed: 0, failed: 0, completed: 0 },
+    failedJobs: [],
+  };
+}
+
+function workerHealth(queueHealth: Awaited<ReturnType<typeof loadQueueHealth>>) {
+  const analyzeQueue = queueHealth.queues.find((queue) => queue.name === (process.env.ANALYZE_VISIT_QUEUE || "analyze_visit"));
+  const waiting = Number(analyzeQueue?.counts.waiting ?? 0);
+  const active = Number(analyzeQueue?.counts.active ?? 0);
+  const failed = queueHealth.queues.reduce((total, queue) => total + Number(queue.counts.failed ?? 0), 0);
+
+  if (queueHealth.status !== "connected") return { status: "degraded", reason: "Redis unavailable" };
+  if (failed > 0) return { status: "attention", reason: `${failed} failed job(s)` };
+  if (waiting > 10) return { status: "busy", reason: `${waiting} jobs waiting` };
+  return { status: active > 0 ? "processing" : "healthy", reason: active > 0 ? `${active} active job(s)` : "Queues are clear" };
+}
+
+function buildTimelines(events: EventRow[], visitMap: Map<string, Prisma.VisitGetPayload<{ include: { outlet: true; rep: { select: { name: true } }; aiResult: true; fraudSignals: true } }>>) {
+  const byVisit = new Map<string, EventRow[]>();
+  for (const event of events) {
+    if (!event.visitId) continue;
+    byVisit.set(event.visitId, [...(byVisit.get(event.visitId) ?? []), event]);
+  }
+
+  return [...byVisit.entries()].slice(0, 8).map(([visitId, visitEvents]) => {
+    const visit = visitMap.get(visitId);
+    const sorted = [...visitEvents].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    return {
+      visitId,
+      outletName: visit?.outlet.name ?? "Unknown outlet",
+      repName: visit?.rep.name ?? "Unknown rep",
+      visitStatus: visit?.status ?? "UNKNOWN",
+      complianceScore: visit?.aiResult?.complianceScore ?? null,
+      fraudSignals: visit?.fraudSignals.filter((signal) => signal.type !== "IMAGE_HASHED").length ?? 0,
+      durationMs: sorted.length > 1 ? sorted.at(-1)!.createdAt.getTime() - sorted[0]!.createdAt.getTime() : null,
+      events: sorted.map((event) => serializeEvent(event, visitMap)),
+    };
+  });
+}
+
+function serializeEvent(event: EventRow, visitMap: Map<string, Prisma.VisitGetPayload<{ include: { outlet: true; rep: { select: { name: true } }; aiResult: true; fraudSignals: true } }>>) {
+  const visit = event.visitId ? visitMap.get(event.visitId) : null;
+  const metadata = isRecord(event.metadata) ? event.metadata : {};
+  return {
+    id: event.id,
+    visitId: event.visitId,
+    jobId: event.jobId,
+    outletName: visit?.outlet.name ?? null,
+    event: event.event,
+    level: event.level,
+    stage: stringField(metadata.stage) ?? stageFromEvent(event.event),
+    traceId: event.traceId,
+    latencyMs: numberField(metadata.latencyMs) ?? numberField(metadata.durationMs),
+    metadata,
+    createdAt: event.createdAt.toISOString(),
+  };
+}
+
+function assistantStats(events: EventRow[]) {
+  const assistantEvents = events.filter((event) => stageFromEvent(event.event) === "assistant" || event.event.includes("ASSISTANT"));
+  return {
+    recentQueries: assistantEvents.length,
+    lastEventAt: assistantEvents[0]?.createdAt.toISOString() ?? null,
+  };
+}
+
+function stageFromEvent(event: string): string {
+  if (event.includes("UPLOAD")) return "upload";
+  if (event.includes("QUEUED") || event.includes("SUBMITTED")) return "queue";
+  if (event.includes("FRAUD")) return "fraud";
+  if (event.includes("REPORT")) return "report";
+  if (event.includes("INDEX")) return "embedding";
+  if (event.includes("ASSISTANT")) return "assistant";
+  if (event.includes("ANALYZE")) return "analyze_visit";
+  return "event";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function numberField(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function stringField(value: unknown): string | null {
+  return typeof value === "string" && value ? value : null;
+}

@@ -1,13 +1,12 @@
 import type { NextRequest } from "next/server";
-import { auth } from "@/lib/auth";
 import { OutletResolutionError, submitOutletSelection } from "@/lib/outlets";
+import { requireApiSession, ROLE_GROUPS } from "@/lib/rbac";
 import { NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user || session.user.role !== "REP") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const authz = await requireApiSession(ROLE_GROUPS.rep);
+  if (!authz.ok) return authz.response;
+  const { session } = authz;
 
   const body = await request.json();
   try {

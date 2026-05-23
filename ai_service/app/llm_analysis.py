@@ -5,6 +5,7 @@ import mimetypes
 import os
 
 from . import config
+from .observability import capture_exception, observe_latency, openai_latency
 from .schemas import CountAudit, LLMRetailAnalysis, POSMAnalysis, YoloResponse
 
 
@@ -142,26 +143,38 @@ def analyze_retail_image(
     image_url = image_to_data_url(image_path)
     prompt = build_prompt(yolo=yolo, outlet_name=outlet_name, rep_notes=rep_notes)
 
-    response = client.responses.create(
-        model=config.LLM_MODEL,
-        input=[
-            {
-                "role": "user",
-                "content": [
-                    {"type": "input_text", "text": prompt},
-                    {"type": "input_image", "image_url": image_url, "detail": "low"},
+    try:
+        with observe_latency(
+            openai_latency,
+            ("posm_vision", config.LLM_MODEL),
+            "openai_posm_analysis_completed",
+            stage="openai_posm",
+            model=config.LLM_MODEL,
+            visitId=yolo.visit_id,
+        ):
+            response = client.responses.create(
+                model=config.LLM_MODEL,
+                input=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "input_text", "text": prompt},
+                            {"type": "input_image", "image_url": image_url, "detail": "low"},
+                        ],
+                    }
                 ],
-            }
-        ],
-        text={
-            "format": {
-                "type": "json_schema",
-                "name": "retail_posm_analysis",
-                "strict": True,
-                "schema": POSM_SCHEMA,
-            }
-        },
-    )
+                text={
+                    "format": {
+                        "type": "json_schema",
+                        "name": "retail_posm_analysis",
+                        "strict": True,
+                        "schema": POSM_SCHEMA,
+                    }
+                },
+            )
+    except Exception as error:
+        capture_exception(error, stage="openai_posm", visit_id=yolo.visit_id, model=config.LLM_MODEL, inference_type="vision")
+        raise
 
     parsed = parse_json_output(response.output_text)
     return LLMRetailAnalysis(

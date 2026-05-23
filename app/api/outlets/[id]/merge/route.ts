@@ -1,16 +1,15 @@
 import type { NextRequest } from "next/server";
-import { auth } from "@/lib/auth";
 import { mergeOutlet, OutletResolutionError } from "@/lib/outlets";
 import { prisma } from "@/lib/prisma";
+import { requireApiSession, ROLE_GROUPS } from "@/lib/rbac";
 import { NextResponse } from "next/server";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function POST(request: NextRequest, { params }: Params) {
-  const session = await auth();
-  if (!session?.user || (session.user.role !== "SUPERVISOR" && session.user.role !== "ADMIN")) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const authz = await requireApiSession(ROLE_GROUPS.supervisor);
+  if (!authz.ok) return authz.response;
+  const { session } = authz;
 
   const { id } = await params;
   const body = await request.json();

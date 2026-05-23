@@ -83,6 +83,9 @@ ANALYZE_VISIT_QUEUE=analyze_visit
 ANALYZE_VISIT_DLQ=analyze_visit_dlq
 EMBED_VISIT_REPORT_QUEUE=embed_visit_report
 WORKER_USE_LLM=true
+WORKER_METRICS_PORT=9101
+LOG_TO_FILE=false
+SENTRY_DSN=
 ```
 
 `RETAILOS_AI_SERVICE_API_KEY` is optional for local dev. When set on the FastAPI service, the worker sends it as `x-api-key` for `/analyze-shelf`.
@@ -101,5 +104,28 @@ npm run rag:index-reports -- --limit=100
 ```
 
 The backfill uses Postgres when `DATABASE_URL` is present and falls back to `worker/data/db.json` for local demos.
+
+## Observability
+
+The worker emits structured JSON logs, Sentry errors, and Prometheus metrics.
+
+Metrics:
+
+```text
+http://127.0.0.1:9101/metrics
+```
+
+Enable local Loki ingestion through Promtail:
+
+```powershell
+$env:LOG_TO_FILE='true'
+npm run worker
+```
+
+Then start:
+
+```powershell
+docker compose -f docker-compose.observability.yml up -d
+```
 
 See [docs/BACKEND_HANDOFF.md](../docs/BACKEND_HANDOFF.md) for the Next.js integration contract and dashboard fields.

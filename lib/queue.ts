@@ -1,5 +1,8 @@
 import { Queue } from "bullmq";
 import { Redis } from "ioredis";
+import { createCorrelationId } from "@/lib/observability/correlation";
+import { logInfo } from "@/lib/observability/logger";
+import { metrics } from "@/lib/observability/metrics";
 
 export type AnalyzeVisitJobData = {
   visitId: string;
@@ -38,9 +41,10 @@ export function getAnalyzeVisitQueue() {
   return analyzeQueue;
 }
 
-export async function enqueueAnalyzeVisit(visitId: string, useLlm = true) {
+export async function enqueueAnalyzeVisit(visitId: string, useLlm = true, correlationId = createCorrelationId("visit")) {
   const queue = getAnalyzeVisitQueue();
-  const traceId = crypto.randomUUID();
+  const traceId = correlationId;
+  const started = Date.now();
   await queue.add(
     "analyze_visit",
     { visitId, traceId, useLlm },
@@ -52,5 +56,14 @@ export async function enqueueAnalyzeVisit(visitId: string, useLlm = true) {
       removeOnFail: 100,
     },
   );
+  logInfo("analyze visit queued", {
+    correlationId: traceId,
+    visitId,
+    stage: "queue",
+    status: "queued",
+    latencyMs: Date.now() - started,
+    queue: queueConfig.analyzeVisitQueueName,
+  });
+  metrics.stageLatency.labels("queue", "success").observe(Date.now() - started);
   return traceId;
 }
