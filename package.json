@@ -19,6 +19,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "test:whatsapp": "tsx scripts/test-whatsapp-alert.ts",
     "test:whatsapp:fraud": "tsx scripts/test-fraud-whatsapp-alert.ts",
+    "test:outlet-resolution": "tsx scripts/test-outlet-resolution.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

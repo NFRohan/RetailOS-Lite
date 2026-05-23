@@ -151,11 +151,12 @@ export default function NewVisitPage() {
   async function handleSubmit() {
     setSubmitting(true);
     setError("");
+    const resolvedOutletId = selectedOutletId || selectedOutlet?.id || undefined;
     const payload: OfflineVisitPayload = {
       clientVisitId: createClientVisitId(),
       outletName: normalizedShopName,
-      outletId: selectedOutletId || undefined,
-      forceNewOutlet: forceNewOutlet || !selectedOutletId,
+      outletId: resolvedOutletId,
+      forceNewOutlet: forceNewOutlet && !resolvedOutletId,
       checkInLat: gps?.lat ?? null,
       checkInLng: gps?.lng ?? null,
       clientTimestamp: new Date().toISOString(),

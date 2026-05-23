@@ -159,7 +159,7 @@ export async function submitOutletSelection({
   const lng = numberOrNull(submittedLng);
   const possibleMatches = lat !== null && lng !== null ? await searchOutletCandidates({ query: name, lat, lng }) : null;
 
-  if (selectedOutlet && !forceNewOutlet) {
+  if (selectedOutlet) {
     const selectedCandidate =
       possibleMatches?.candidates.find((candidate) => candidate.id === selectedOutlet.id) ??
       (lat !== null && lng !== null ? scoreOutletCandidate(selectedOutlet, normalizedName, lat, lng) : null);
