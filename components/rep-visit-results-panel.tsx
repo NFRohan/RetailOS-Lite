@@ -53,6 +53,9 @@ export function RepVisitResultsPanel({ visit, outcome }: Props) {
     }))
   ).filter((signal) => signal.type !== "IMAGE_HASHED");
   const isFraudFlagged = fraudSignals.length > 0;
+  const complianceReasons = (outcome?.complianceReasons ?? ["Analysis did not return detailed compliance reasons."]).filter(
+    (reason) => !isCountAuditReason(reason),
+  );
 
   return (
     <div className="space-y-4">
@@ -119,14 +122,12 @@ export function RepVisitResultsPanel({ visit, outcome }: Props) {
         </CardHeader>
         <CardContent>
           <ul className="space-y-3">
-            {(outcome?.complianceReasons ?? ["Analysis did not return detailed compliance reasons."]).map(
-              (reason, i) => (
-                <li key={i} className="flex items-start gap-3 text-sm leading-relaxed text-muted-foreground">
-                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-teal" />
-                  <span>{reason}</span>
-                </li>
-              ),
-            )}
+            {complianceReasons.map((reason, i) => (
+              <li key={i} className="flex items-start gap-3 text-sm leading-relaxed text-muted-foreground">
+                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-teal" />
+                <span>{reason}</span>
+              </li>
+            ))}
           </ul>
         </CardContent>
       </Card>
@@ -193,6 +194,10 @@ export function RepVisitResultsPanel({ visit, outcome }: Props) {
       </Card>
     </div>
   );
+}
+
+function isCountAuditReason(reason: string): boolean {
+  return reason.toLowerCase().includes("openai visual audit adjusted");
 }
 
 function MetricPill({ label, value }: { label: string; value: string }) {

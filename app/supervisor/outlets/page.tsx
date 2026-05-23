@@ -78,6 +78,15 @@ export default function OutletVerificationPage() {
     },
     refetchInterval: 5000,
   });
+  const { data: masterOutlets = [], isLoading: masterLoading } = useQuery<OutletRecord[]>({
+    queryKey: ["outlets-master"],
+    queryFn: async () => {
+      const response = await fetch("/api/outlets");
+      if (!response.ok) throw new Error("Could not load master outlet list.");
+      return response.json();
+    },
+    refetchInterval: 10000,
+  });
 
   const submissions = data?.submissions ?? [];
   const orphanedOutlets = data?.orphanedOutlets ?? [];
@@ -156,6 +165,25 @@ export default function OutletVerificationPage() {
               submissions={submissions}
             />
           )}
+        </CardContent>
+      </Card>
+
+      <Card className="overflow-hidden border-[#d6ddea] bg-white shadow-[0_1px_3px_rgba(2,43,58,0.05)]">
+        <CardHeader className="border-b bg-white p-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="text-xl text-navy">Master Outlet List</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Canonical shops already known to RetailOS, including verified, pending, and rejected records.
+              </p>
+            </div>
+            <Badge variant="secondary" className="w-fit">
+              {masterOutlets.length} outlets
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {masterLoading ? <OutletQueueSkeleton /> : <MasterOutletList outlets={masterOutlets} />}
         </CardContent>
       </Card>
     </div>
@@ -354,7 +382,7 @@ function OrphanedOutletCard({
       <div>
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-lg font-bold text-navy">{outlet.name}</h2>
-          <Badge variant="warning">Legacy pending outlet</Badge>
+          <Badge variant="warning">Pending outlet record</Badge>
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
           {outlet.code} • Created {formatDate(outlet.createdAt)} • {outlet._count?.visits ?? 0} visit
@@ -390,6 +418,61 @@ function OrphanedOutletCard({
       </div>
     </div>
   );
+}
+
+function MasterOutletList({ outlets }: { outlets: OutletRecord[] }) {
+  if (outlets.length === 0) {
+    return (
+      <div className="p-12 text-center">
+        <Store className="mx-auto h-10 w-10 text-teal" />
+        <p className="mt-3 font-semibold text-navy">No outlets in the master registry yet.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Rep-created or supervisor-approved shops will appear here.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-h-[520px] overflow-auto">
+      <table className="w-full text-left text-sm">
+        <thead className="sticky top-0 z-10 border-b bg-navy/5 text-xs font-semibold uppercase tracking-wide text-navy">
+          <tr>
+            <th className="px-4 py-3">Outlet</th>
+            <th className="px-4 py-3">Status</th>
+            <th className="px-4 py-3">GPS</th>
+            <th className="px-4 py-3">Visits</th>
+            <th className="px-4 py-3">Created</th>
+          </tr>
+        </thead>
+        <tbody>
+          {outlets.map((outlet) => (
+            <tr key={outlet.id} className="border-b last:border-0 hover:bg-teal/5">
+              <td className="px-4 py-3">
+                <p className="font-semibold text-navy">{outlet.name}</p>
+                <p className="text-xs text-muted-foreground">{outlet.code}</p>
+                {outlet.address && <p className="mt-1 text-xs text-muted-foreground">{outlet.address}</p>}
+              </td>
+              <td className="px-4 py-3">
+                <OutletStatusBadge status={outlet.verificationStatus} />
+              </td>
+              <td className="px-4 py-3 text-xs text-muted-foreground">
+                {outlet.latitude !== null && outlet.longitude !== null
+                  ? `${outlet.latitude.toFixed(5)}, ${outlet.longitude.toFixed(5)}`
+                  : "Not captured"}
+              </td>
+              <td className="px-4 py-3 text-muted-foreground">{outlet._count?.visits ?? 0}</td>
+              <td className="px-4 py-3 text-muted-foreground">{formatDate(outlet.createdAt)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function OutletStatusBadge({ status }: { status: OutletRecord["verificationStatus"] }) {
+  if (status === "VERIFIED") return <Badge variant="success">Verified</Badge>;
+  if (status === "REJECTED") return <Badge variant="critical">Rejected</Badge>;
+  return <Badge variant="warning">Pending</Badge>;
 }
 
 function ReviewButton({

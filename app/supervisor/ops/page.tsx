@@ -1,11 +1,22 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Activity, AlertTriangle, Clock3, DatabaseZap, Gauge, RadioTower, Workflow } from "lucide-react";
+import {
+  Activity,
+  AlertTriangle,
+  ChevronDown,
+  ChevronRight,
+  Clock3,
+  DatabaseZap,
+  Gauge,
+  RadioTower,
+  Workflow,
+} from "lucide-react";
 
 type OpsData = {
   generatedAt: string;
@@ -109,41 +120,7 @@ export default function SupervisorOpsPage() {
               <EmptyState text="No visit timelines yet. Submit a rep visit to see the AI workflow unfold here." />
             ) : (
               data.timelines.map((timeline, index) => (
-                <motion.div
-                  key={timeline.visitId}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.03 }}
-                  className="rounded-2xl border border-[#d6ddea] bg-[#f8fafc] p-4"
-                >
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="font-semibold text-navy">{timeline.outletName}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {timeline.visitId} • {timeline.repName}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <VisitStatusBadge status={timeline.visitStatus} />
-                      <Badge variant="secondary">{timeline.complianceScore ?? "N/A"}% compliance</Badge>
-                      <Badge variant={timeline.fraudSignals > 0 ? "warning" : "success"}>{fraudSignalLabel(timeline.fraudSignals)}</Badge>
-                      {timeline.durationMs !== null && <DurationPill value={timeline.durationMs} />}
-                    </div>
-                  </div>
-                  <div className="mt-4 space-y-3">
-                    {timeline.events.map((event) => (
-                      <div key={event.id} className="grid gap-3 rounded-xl bg-white p-3 text-sm sm:grid-cols-[92px_120px_minmax(0,1fr)_auto]">
-                        <span className="font-mono text-xs text-muted-foreground">{timeOnly(event.createdAt)}</span>
-                        <StageBadge stage={event.stage} level={event.level} />
-                        <div>
-                          <p className="font-medium text-navy">{humanize(event.event)}</p>
-                          <p className="truncate text-xs text-muted-foreground">{event.traceId ?? event.jobId ?? "no correlation id"}</p>
-                        </div>
-                        {event.latencyMs !== null && <DurationPill value={event.latencyMs} />}
-                      </div>
-                    ))}
-                  </div>
-                </motion.div>
+                <TimelineCard key={timeline.visitId} index={index} timeline={timeline} />
               ))
             )}
           </CardContent>
@@ -197,6 +174,58 @@ export default function SupervisorOpsPage() {
   );
 }
 
+function TimelineCard({ index, timeline }: { index: number; timeline: OpsData["timelines"][number] }) {
+  const [open, setOpen] = useState(index === 0);
+  const latestEvent = timeline.events[0];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.03 }}
+      className="rounded-2xl border border-[#d6ddea] bg-[#f8fafc]"
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className="flex w-full flex-col gap-3 p-4 text-left sm:flex-row sm:items-center sm:justify-between"
+      >
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            {open ? <ChevronDown className="h-4 w-4 text-teal" /> : <ChevronRight className="h-4 w-4 text-teal" />}
+            <p className="truncate font-semibold text-navy">{timeline.outletName}</p>
+          </div>
+          <p className="mt-1 truncate text-xs text-muted-foreground">
+            {timeline.visitId} / {timeline.repName}
+            {latestEvent ? ` / latest: ${humanize(latestEvent.event)}` : ""}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <VisitStatusBadge status={timeline.visitStatus} />
+          <Badge variant="secondary">{timeline.complianceScore ?? "N/A"}% compliance</Badge>
+          <Badge variant={timeline.fraudSignals > 0 ? "warning" : "success"}>{fraudSignalLabel(timeline.fraudSignals)}</Badge>
+          {timeline.durationMs !== null && <DurationPill value={timeline.durationMs} />}
+        </div>
+      </button>
+      {open && (
+        <div className="space-y-3 border-t border-[#d6ddea] p-4">
+          {timeline.events.map((event) => (
+            <div key={event.id} className="grid gap-3 rounded-xl bg-white p-3 text-sm sm:grid-cols-[92px_132px_minmax(0,1fr)_auto]">
+              <span className="font-mono text-xs text-muted-foreground">{timeOnly(event.createdAt)}</span>
+              <StageBadge stage={event.stage} level={event.level} />
+              <div>
+                <p className="font-medium text-navy">{humanize(event.event)}</p>
+                <p className="truncate text-xs text-muted-foreground">{event.traceId ?? event.jobId ?? "no correlation id"}</p>
+              </div>
+              {event.latencyMs !== null && <DurationPill value={event.latencyMs} />}
+            </div>
+          ))}
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
 function OpsStat({ icon: Icon, label, value, helper, intent = "default" }: { icon: typeof Activity; label: string; value: string | number; helper: string; intent?: "default" | "critical" }) {
   const critical = intent === "critical";
   return (
@@ -218,8 +247,21 @@ function queueLabel(queue: OpsData["queueHealth"]["queues"][number] | undefined)
 }
 
 function StageBadge({ stage, level }: { stage: string; level: string }) {
-  const variant = level === "error" ? "critical" : level === "warn" ? "warning" : "secondary";
-  return <Badge variant={variant}>{stage}</Badge>;
+  return <span className={`inline-flex w-fit items-center rounded-full px-2.5 py-1 text-xs font-semibold ${stageBadgeStyles(stage, level)}`}>{stage}</span>;
+}
+
+function stageBadgeStyles(stage: string, level: string) {
+  if (level === "error") return "bg-rose-100 text-rose-800";
+  if (level === "warn") return "bg-amber-100 text-amber-900";
+  const normalized = stage.toLowerCase();
+  if (normalized.includes("upload")) return "bg-sky-100 text-sky-800";
+  if (normalized.includes("queue")) return "bg-violet-100 text-violet-800";
+  if (normalized.includes("yolo") || normalized.includes("analyze")) return "bg-cyan-100 text-cyan-800";
+  if (normalized.includes("fraud")) return "bg-rose-100 text-rose-800";
+  if (normalized.includes("report")) return "bg-emerald-100 text-emerald-800";
+  if (normalized.includes("embedding")) return "bg-indigo-100 text-indigo-800";
+  if (normalized.includes("assistant")) return "bg-fuchsia-100 text-fuchsia-800";
+  return "bg-slate-100 text-slate-700";
 }
 
 function VisitStatusBadge({ status }: { status: string }) {

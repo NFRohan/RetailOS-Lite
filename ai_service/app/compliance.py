@@ -14,10 +14,7 @@ def status_for_score(score: int) -> str:
 def evaluate_compliance(yolo: YoloResponse, llm: LLMRetailAnalysis | None = None) -> ComplianceResult:
     score = 100
     reasons: list[str] = []
-    counts, visibility_ratio, used_count_audit = effective_shelf_metrics(yolo, llm)
-
-    if used_count_audit:
-        reasons.append("OpenAI visual audit adjusted unreliable YOLO count estimates.")
+    counts, visibility_ratio, _used_count_audit = effective_shelf_metrics(yolo, llm)
 
     if counts.total == 0:
         score -= 75

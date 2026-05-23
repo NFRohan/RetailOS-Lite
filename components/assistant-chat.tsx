@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState, useTransition } from "react";
+import { FormEvent, useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,11 +19,28 @@ const EXAMPLE_PROMPTS = [
   "Show visits that need supervisor review and why.",
   "Which outlets have fraud signals?",
 ];
+const CHAT_STORAGE_KEY = "retailos:assistant-chat:v1";
 
 export function AssistantChat() {
   const [question, setQuestion] = useState(EXAMPLE_PROMPTS[0]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [loadedSavedChat, setLoadedSavedChat] = useState(false);
   const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(CHAT_STORAGE_KEY);
+      if (saved) setMessages(JSON.parse(saved) as ChatMessage[]);
+    } catch {
+      window.localStorage.removeItem(CHAT_STORAGE_KEY);
+    }
+    setLoadedSavedChat(true);
+  }, []);
+
+  useEffect(() => {
+    if (!loadedSavedChat) return;
+    window.localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages.slice(-20)));
+  }, [loadedSavedChat, messages]);
 
   function askAssistant(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
@@ -85,6 +102,17 @@ export function AssistantChat() {
                 <Search className="h-3.5 w-3.5" />
                 Pinecone RAG
               </Badge>
+              {messages.length > 0 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full"
+                  onClick={() => setMessages([])}
+                >
+                  Clear chat
+                </Button>
+              )}
             </div>
           </div>
         </CardHeader>

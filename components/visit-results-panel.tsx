@@ -48,6 +48,9 @@ export function VisitResultsPanel({ visit, outcome }: Props) {
     outcome?.fraudSignals ??
     visit.fraudSignals.map((s) => ({ type: s.type, severity: s.severity, message: s.message }))
   ).filter((signal) => signal.type !== "IMAGE_HASHED");
+  const complianceReasons = (outcome?.complianceReasons ?? ["Analysis did not return detailed compliance reasons."]).filter(
+    (reason) => !isCountAuditReason(reason),
+  );
 
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
@@ -79,14 +82,12 @@ export function VisitResultsPanel({ visit, outcome }: Props) {
             </CardHeader>
             <CardContent>
               <ul className="space-y-2">
-                {(outcome?.complianceReasons ?? ["Analysis did not return detailed compliance reasons."]).map(
-                  (reason, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-teal" />
-                      {reason}
-                    </li>
-                  ),
-                )}
+                {complianceReasons.map((reason, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-teal" />
+                    {reason}
+                  </li>
+                ))}
               </ul>
             </CardContent>
           </Card>
@@ -134,7 +135,6 @@ export function VisitResultsPanel({ visit, outcome }: Props) {
             <blockquote className="rounded-lg bg-[#eef2fb] p-4 text-sm leading-relaxed text-navy/80">
               &quot;{summary || "No AI summary available yet."}&quot;
             </blockquote>
-            <button className="mt-3 text-xs font-semibold text-teal hover:underline">View full transcript</button>
           </CardContent>
         </Card>
 
@@ -170,6 +170,10 @@ export function VisitResultsPanel({ visit, outcome }: Props) {
       </aside>
     </div>
   );
+}
+
+function isCountAuditReason(reason: string): boolean {
+  return reason.toLowerCase().includes("openai visual audit adjusted");
 }
 
 function HighSeverityFraudCard({ signals }: { signals: Array<{ type: string; severity: string; message: string }> }) {

@@ -1,6 +1,11 @@
 import type { NextRequest } from "next/server";
 import * as Sentry from "@sentry/nextjs";
-import { buildAssistantExactContext, fallbackAssistantAnswer, type AssistantAnswer } from "@/lib/assistant";
+import {
+  buildAssistantExactContext,
+  exactNoMatchAssistantAnswer,
+  fallbackAssistantAnswer,
+  type AssistantAnswer,
+} from "@/lib/assistant";
 import { correlationIdFromHeaders } from "@/lib/observability/correlation";
 import { logError, logInfo, logWarn } from "@/lib/observability/logger";
 import { metrics } from "@/lib/observability/metrics";
@@ -22,6 +27,25 @@ export async function POST(request: NextRequest) {
   }
 
   const exactContext = await buildAssistantExactContext(question);
+  const exactNoMatch = exactContext.length === 0 ? exactNoMatchAssistantAnswer(question) : null;
+  if (exactNoMatch) {
+    const latencyMs = Date.now() - started;
+    await recordAssistantEvent({
+      event: "ASSISTANT_QUERY_COMPLETED",
+      level: "info",
+      traceId: correlationId,
+      userId: session.user.id,
+      question,
+      latencyMs,
+      exactContextCount: 0,
+      retrievalMode: "exact",
+      sourceCount: 0,
+      status: "exact_no_match",
+    });
+    const nextResponse = NextResponse.json(exactNoMatch);
+    nextResponse.headers.set("x-correlation-id", correlationId);
+    return nextResponse;
+  }
   const aiServiceUrl = (process.env.AI_SERVICE_URL ?? "http://127.0.0.1:8001").replace(/\/$/, "");
   const apiKey = process.env.RETAILOS_AI_SERVICE_API_KEY ?? process.env.AI_SERVICE_API_KEY;
 
