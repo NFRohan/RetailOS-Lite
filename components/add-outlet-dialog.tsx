@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Loader2, MapPin, Plus } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Loader2, MapPin, Plus, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -34,14 +34,17 @@ type Props = {
   onLocationCaptured?: (location: Location) => void;
 };
 
-function suggestCode(name: string): string {
+function createCodeSuffix(): string {
+  return Date.now().toString(36).slice(-4).toUpperCase();
+}
+
+function suggestCode(name: string, suffix: string): string {
   const slug = name
     .trim()
     .toUpperCase()
     .replace(/[^A-Z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 12);
-  const suffix = Date.now().toString(36).slice(-4).toUpperCase();
   return slug ? `${slug}-${suffix}` : `OUT-${suffix}`;
 }
 
@@ -54,28 +57,31 @@ export function AddOutletDialog({
   onLocationCaptured,
 }: Props) {
   const [name, setName] = useState(defaultName);
-  const [code, setCode] = useState("");
   const [address, setAddress] = useState("");
   const [location, setLocation] = useState<Location | null>(null);
   const [locating, setLocating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [codeSuffix, setCodeSuffix] = useState(createCodeSuffix);
+  const previousOpen = useRef(false);
+  const suggestedCode = useMemo(() => suggestCode(name, codeSuffix), [name, codeSuffix]);
 
   useEffect(() => {
-    if (open) {
+    if (open && !previousOpen.current) {
       setName(defaultName);
-      setCode(defaultName.trim() ? suggestCode(defaultName) : "");
       setLocation(gps ?? null);
+      setCodeSuffix(createCodeSuffix());
       setError("");
     }
+    previousOpen.current = open;
   }, [open, defaultName, gps]);
 
   function resetForm() {
     setName("");
-    setCode("");
     setAddress("");
     setLocation(null);
     setError("");
+    setCodeSuffix(createCodeSuffix());
   }
 
   function handleOpenChange(next: boolean) {
@@ -111,7 +117,6 @@ export function AddOutletDialog({
     setError("");
 
     const trimmedName = name.trim();
-    const trimmedCode = (code.trim() || suggestCode(trimmedName)).toUpperCase();
     if (!trimmedName) {
       setError("Store name is required.");
       return;
@@ -129,7 +134,7 @@ export function AddOutletDialog({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: trimmedName,
-          code: trimmedCode,
+          code: suggestCode(trimmedName, codeSuffix).toUpperCase(),
           address: address.trim() || undefined,
           latitude: location.lat,
           longitude: location.lng,
@@ -168,25 +173,34 @@ export function AddOutletDialog({
               id="store-name"
               placeholder="Maa Enterprise"
               value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                if (!code || code === suggestCode(name)) {
-                  setCode(suggestCode(e.target.value));
-                }
-              }}
+              onChange={(e) => setName(e.target.value)}
               disabled={submitting}
+              autoComplete="off"
             />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="store-code">Store code</Label>
-            <Input
-              id="store-code"
-              placeholder="MAA-ENT-A1B2"
-              value={code}
-              onChange={(e) => setCode(e.target.value.toUpperCase())}
-              disabled={submitting}
-            />
+            <div className="flex gap-2">
+              <Input
+                id="store-code"
+                value={name.trim() ? suggestedCode : ""}
+                readOnly
+                placeholder="Auto-generated after naming the store"
+                className="bg-muted/40"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                className="shrink-0 rounded-xl"
+                onClick={() => setCodeSuffix(createCodeSuffix())}
+                disabled={submitting}
+                aria-label="Regenerate store code"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">Generated per new store to avoid reused codes.</p>
           </div>
 
           <div className="space-y-2">
@@ -226,7 +240,7 @@ export function AddOutletDialog({
               {submitting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Creating…
+                  Creating...
                 </>
               ) : (
                 <>
