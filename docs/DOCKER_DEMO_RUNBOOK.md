@@ -8,6 +8,9 @@ Use this path for the live demo to avoid host Postgres/Redis port conflicts.
 npm run demo:up
 ```
 
+The first AI service build is still the slowest step because it installs the CPU
+vision stack. Later runs should reuse Docker cache unless dependencies change.
+
 Detached mode:
 
 ```powershell
@@ -68,6 +71,7 @@ docker compose -f docker-compose.demo.yml down -v
 ## Notes
 
 - `app-init` runs `prisma db push` and `prisma db seed` before web/worker start.
+- Web and worker share the same slim production Node image; app-init uses a separate tools image for Prisma.
 - The YOLO model is mounted from `Detection Model/best.pt`.
 - OpenAI, Pinecone, Sentry, and Twilio secrets are read from local `.env` / `ai_service/.env`.
 - Uploaded images are stored in a shared Docker volume so web, worker, and AI service see the same local paths.

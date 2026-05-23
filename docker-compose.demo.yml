@@ -105,6 +105,7 @@ services:
       "
 
   ai-service:
+    image: retailos-lite-demo-ai-service:latest
     build:
       context: .
       dockerfile: ai_service/Dockerfile
@@ -127,9 +128,11 @@ services:
       retries: 30
 
   app-init:
+    image: retailos-lite-demo-tools:latest
     build:
       context: .
       dockerfile: Dockerfile
+      target: tools
     environment:
       <<: *node-env
     depends_on:
@@ -140,9 +143,11 @@ services:
     command: ["sh", "-c", "npm run db:push && npm run db:seed"]
 
   web:
+    image: retailos-lite-demo-app:latest
     build:
       context: .
       dockerfile: Dockerfile
+      target: runner
     environment:
       <<: *node-env
       PORT: 3000
@@ -165,12 +170,10 @@ services:
       retries: 30
 
   worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: retailos-lite-demo-app:latest
     environment:
       <<: *node-env
-    command: ["npm", "run", "worker"]
+    command: ["node", "dist-worker/index.js"]
     ports:
       - "${WORKER_METRICS_HOST_PORT:-9101}:9101"
     volumes:
