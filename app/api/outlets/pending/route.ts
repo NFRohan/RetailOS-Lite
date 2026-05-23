@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { searchOutletCandidates, type OutletSearchCandidate } from "@/lib/outlets";
 import { requireApiSession, ROLE_GROUPS } from "@/lib/rbac";
 import { NextResponse } from "next/server";
 
@@ -31,15 +32,53 @@ export async function GET() {
     orderBy: { createdAt: "desc" },
   });
 
+  const submissionsWithLiveMatches = await Promise.all(
+    submissions.map(async (submission) => {
+      const liveMatches = await loadLivePossibleMatches(submission);
+      const reviewOutletId = submission.createdOutletId ?? submission.matchedOutletId;
+      const bestExternalMatch = liveMatches.find((match) => match.id !== reviewOutletId) ?? null;
+
+      return {
+        ...submission,
+        matchConfidence: bestExternalMatch?.confidence ?? submission.matchConfidence,
+        possibleMatches: liveMatches,
+      };
+    }),
+  );
+
   return NextResponse.json({
-    submissions: submissions.map((submission) => ({
-      ...submission,
-      possibleMatches: parsePossibleMatches(submission.possibleMatches),
-    })),
+    submissions: submissionsWithLiveMatches,
     orphanedOutlets,
   });
 }
 
-function parsePossibleMatches(value: Prisma.JsonValue) {
-  return Array.isArray(value) ? value : [];
+function parsePossibleMatches(value: Prisma.JsonValue): OutletSearchCandidate[] {
+  return Array.isArray(value) ? value.filter(isOutletSearchCandidate) : [];
+}
+
+function isOutletSearchCandidate(value: Prisma.JsonValue): value is OutletSearchCandidate {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  return "id" in value;
+}
+
+async function loadLivePossibleMatches(submission: {
+  submittedName: string;
+  submittedLat: number | null;
+  submittedLng: number | null;
+  possibleMatches: Prisma.JsonValue;
+}) {
+  if (submission.submittedLat === null || submission.submittedLng === null) {
+    return parsePossibleMatches(submission.possibleMatches);
+  }
+
+  try {
+    const result = await searchOutletCandidates({
+      query: submission.submittedName,
+      lat: submission.submittedLat,
+      lng: submission.submittedLng,
+    });
+    return result.candidates;
+  } catch {
+    return parsePossibleMatches(submission.possibleMatches);
+  }
 }

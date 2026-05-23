@@ -26,15 +26,16 @@ export default function RepVisitDetailPage() {
     refetchInterval: (query) => {
       const status = query.state.data?.status;
       if (status && TERMINAL_STATUSES.includes(status)) return false;
-      return 2000;
+      return 750;
     },
+    refetchIntervalInBackground: true,
   });
 
   useEffect(() => {
     if (visit?.status !== "ANALYZING") return;
     const interval = setInterval(() => {
       setPipelineStep((s) => (s < 4 ? s + 1 : s));
-    }, 2500);
+    }, 1400);
     return () => clearInterval(interval);
   }, [visit?.status]);
 
