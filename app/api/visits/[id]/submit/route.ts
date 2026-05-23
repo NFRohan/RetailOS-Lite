@@ -1,11 +1,11 @@
 import type { NextRequest } from "next/server";
 import * as Sentry from "@sentry/nextjs";
-import { auth } from "@/lib/auth";
 import { correlationIdFromHeaders } from "@/lib/observability/correlation";
 import { logError, logInfo } from "@/lib/observability/logger";
 import { metrics } from "@/lib/observability/metrics";
 import { prisma } from "@/lib/prisma";
 import { enqueueAnalyzeVisit } from "@/lib/queue";
+import { requireApiSession, ROLE_GROUPS } from "@/lib/rbac";
 import { NextResponse } from "next/server";
 
 type Params = { params: Promise<{ id: string }> };
@@ -13,10 +13,9 @@ type Params = { params: Promise<{ id: string }> };
 export async function POST(_request: NextRequest, { params }: Params) {
   const correlationId = correlationIdFromHeaders(_request.headers, "visit");
   const started = Date.now();
-  const session = await auth();
-  if (!session?.user || session.user.role !== "REP") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const authz = await requireApiSession(ROLE_GROUPS.rep);
+  if (!authz.ok) return authz.response;
+  const { session } = authz;
 
   const { id: visitId } = await params;
   const visit = await prisma.visit.findUnique({

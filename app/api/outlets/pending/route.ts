@@ -1,15 +1,13 @@
 import { Prisma } from "@prisma/client";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requireApiSession, ROLE_GROUPS } from "@/lib/rbac";
 import { NextResponse } from "next/server";
 
 const pendingStatuses = ["PENDING_REVIEW", "NEW_OUTLET"] as const;
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user || (session.user.role !== "SUPERVISOR" && session.user.role !== "ADMIN")) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const authz = await requireApiSession(ROLE_GROUPS.supervisor);
+  if (!authz.ok) return authz.response;
 
   const submissions = await prisma.outletSubmission.findMany({
     where: {

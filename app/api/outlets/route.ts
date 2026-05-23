@@ -1,16 +1,14 @@
 import { Prisma } from "@prisma/client";
 import type { NextRequest } from "next/server";
-import { auth } from "@/lib/auth";
 import { normalizeOutletName, numberOrNull } from "@/lib/outlets";
 import { parseOutletVerificationStatus } from "@/lib/outlet-types";
 import { prisma } from "@/lib/prisma";
+import { requireApiSession, ROLE_GROUPS } from "@/lib/rbac";
 import { NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authz = await requireApiSession();
+  if (!authz.ok) return authz.response;
 
   const status = parseOutletVerificationStatus(request.nextUrl.searchParams.get("status"));
   const where: Prisma.OutletWhereInput = status ? { verificationStatus: status } : {};
@@ -23,15 +21,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const allowedRoles = ["REP", "SUPERVISOR", "ADMIN"];
-  if (!allowedRoles.includes(session.user.role)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const authz = await requireApiSession(ROLE_GROUPS.authenticated);
+  if (!authz.ok) return authz.response;
+  const { session } = authz;
 
   const body = await request.json();
   const name = typeof body.name === "string" ? body.name.trim().replace(/\s+/g, " ") : "";

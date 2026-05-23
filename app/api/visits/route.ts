@@ -1,8 +1,8 @@
 import type { Prisma } from "@prisma/client";
 import type { NextRequest } from "next/server";
-import { auth } from "@/lib/auth";
 import { numberOrNull, OutletResolutionError, resolveOutletForVisit } from "@/lib/outlets";
 import { prisma } from "@/lib/prisma";
+import { requireApiSession, ROLE_GROUPS } from "@/lib/rbac";
 import { serializeVisitDetail, serializeVisitListItem } from "@/lib/visits";
 import { NextResponse } from "next/server";
 
@@ -15,10 +15,9 @@ const visitDetailInclude = {
 } satisfies Prisma.VisitInclude;
 
 export async function GET(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authz = await requireApiSession();
+  if (!authz.ok) return authz.response;
+  const { session } = authz;
 
   const isSupervisor = session.user.role === "SUPERVISOR" || session.user.role === "ADMIN";
   const searchParams = request.nextUrl.searchParams;
@@ -72,10 +71,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user || session.user.role !== "REP") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const authz = await requireApiSession(ROLE_GROUPS.rep);
+  if (!authz.ok) return authz.response;
+  const { session } = authz;
 
   const body = await request.json();
   try {

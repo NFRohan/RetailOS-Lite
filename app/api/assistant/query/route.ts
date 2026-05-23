@@ -1,20 +1,19 @@
 import type { NextRequest } from "next/server";
 import * as Sentry from "@sentry/nextjs";
-import { auth } from "@/lib/auth";
 import { buildAssistantExactContext, fallbackAssistantAnswer, type AssistantAnswer } from "@/lib/assistant";
 import { correlationIdFromHeaders } from "@/lib/observability/correlation";
 import { logError, logInfo, logWarn } from "@/lib/observability/logger";
 import { metrics } from "@/lib/observability/metrics";
 import { prisma } from "@/lib/prisma";
+import { requireApiSession, ROLE_GROUPS } from "@/lib/rbac";
 import { NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
   const correlationId = correlationIdFromHeaders(request.headers, "assistant");
   const started = Date.now();
-  const session = await auth();
-  if (!session?.user || !["SUPERVISOR", "ADMIN"].includes(session.user.role)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const authz = await requireApiSession(ROLE_GROUPS.supervisor);
+  if (!authz.ok) return authz.response;
+  const { session } = authz;
 
   const body = await request.json().catch(() => null);
   const question = typeof body?.question === "string" ? body.question.trim() : "";
@@ -89,7 +88,7 @@ export async function POST(request: NextRequest) {
       latencyMs,
       exactContextCount: exactContext.length,
       retrievalMode: answer.retrievalMode,
-      sourceCount: answer.sources?.length ?? 0,
+      sourceCount: answer.matches?.length ?? answer.citations?.length ?? 0,
       status: "success",
     });
     const nextResponse = NextResponse.json({

@@ -1,15 +1,14 @@
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requireApiSession } from "@/lib/rbac";
 import { serializeVisitDetail } from "@/lib/visits";
 import { NextResponse } from "next/server";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_request: Request, { params }: Params) {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authz = await requireApiSession();
+  if (!authz.ok) return authz.response;
+  const { session } = authz;
 
   const { id } = await params;
   const visit = await prisma.visit.findUnique({

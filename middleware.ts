@@ -6,17 +6,22 @@ import { CORRELATION_HEADER, REQUEST_ID_HEADER, createCorrelationId } from "@/li
 type SessionRole = "REP" | "SUPERVISOR" | "ADMIN";
 
 export async function middleware(request: NextRequest) {
-  const token = await getToken({ req: request, secret: process.env.AUTH_SECRET });
+  const token = await getToken({ req: request, secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET });
   const { pathname } = request.nextUrl;
 
   const isRepRoute = pathname.startsWith("/rep");
   const isSupervisorRoute = pathname.startsWith("/supervisor");
+  const isLoginRoute = pathname === "/login";
   const isProtected = isRepRoute || isSupervisorRoute;
 
   const correlationId =
     request.headers.get(CORRELATION_HEADER) ||
     request.headers.get(REQUEST_ID_HEADER) ||
     createCorrelationId("web");
+
+  if (isLoginRoute && token) {
+    return NextResponse.redirect(new URL(homeForRole(token.role as SessionRole | undefined), request.url));
+  }
 
   if (!isProtected) return nextWithCorrelation(request, correlationId);
 
@@ -49,6 +54,12 @@ function nextWithCorrelation(request: NextRequest, correlationId: string) {
   return response;
 }
 
+function homeForRole(role: SessionRole | undefined): string {
+  if (role === "REP") return "/rep/visits";
+  if (role === "SUPERVISOR" || role === "ADMIN") return "/supervisor";
+  return "/login";
+}
+
 export const config = {
-  matcher: ["/rep/:path*", "/supervisor/:path*"],
+  matcher: ["/login", "/rep/:path*", "/supervisor/:path*"],
 };

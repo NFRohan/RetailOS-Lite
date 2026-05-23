@@ -1,13 +1,11 @@
 import type { NextRequest } from "next/server";
-import { auth } from "@/lib/auth";
 import { OutletResolutionError, searchOutletCandidates } from "@/lib/outlets";
+import { requireApiSession } from "@/lib/rbac";
 import { NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authz = await requireApiSession();
+  if (!authz.ok) return authz.response;
 
   const body = await request.json();
   try {

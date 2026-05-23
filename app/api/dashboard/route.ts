@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requireApiSession, ROLE_GROUPS } from "@/lib/rbac";
 import { serializeVisitListItem } from "@/lib/visits";
 import { NextResponse } from "next/server";
 
@@ -29,10 +29,8 @@ type NormalizedDailyAggregate = {
 };
 
 export async function GET(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user || (session.user.role !== "SUPERVISOR" && session.user.role !== "ADMIN")) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const authz = await requireApiSession(ROLE_GROUPS.supervisor);
+  if (!authz.ok) return authz.response;
 
   const rangeDays = rangeDaysFrom(request.nextUrl.searchParams.get("range"));
   const timeZone = timeZoneFrom(request.nextUrl.searchParams.get("tz"));

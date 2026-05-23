@@ -1,17 +1,15 @@
 import type { Prisma } from "@prisma/client";
 import { Queue } from "bullmq";
 import { Redis } from "ioredis";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requireApiSession, ROLE_GROUPS } from "@/lib/rbac";
 import { NextResponse } from "next/server";
 
 type EventRow = Prisma.EventLogGetPayload<object>;
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user || !["SUPERVISOR", "ADMIN"].includes(session.user.role)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const authz = await requireApiSession(ROLE_GROUPS.supervisor);
+  if (!authz.ok) return authz.response;
 
   const [events, queueHealth] = await Promise.all([loadEvents(), loadQueueHealth()]);
   const visitIds = [...new Set(events.map((event) => event.visitId).filter((id): id is string => Boolean(id)))].slice(0, 30);
