@@ -351,6 +351,9 @@ function SubmissionReviewCard({
                   {match.code} • {match.distanceMeters}m away • {match.visitCount} visit
                   {match.visitCount === 1 ? "" : "s"}
                 </p>
+                <p className="mt-2 text-xs text-amber-900">
+                  Merge moves visits and AI reports into this canonical outlet.
+                </p>
                 <ReviewButton
                   action={{ kind: "merge", sourceOutletId, targetOutletId: match.id, submissionId: submission.id }}
                   activeAction={activeAction}

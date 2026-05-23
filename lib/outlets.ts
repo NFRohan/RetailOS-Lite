@@ -56,6 +56,18 @@ export type OutletResolution = {
   matchedBy: "legacy_id" | "rep_selected" | "auto_match" | "new_outlet";
 };
 
+export type OutletMergeResult = {
+  outlet: Outlet & { _count: { visits: number } };
+  sourceOutletId: string;
+  targetOutletId: string;
+  affectedVisitIds: string[];
+  affectedReportIds: string[];
+  movedVisits: number;
+  retargetedReports: number;
+  copiedAliases: number;
+  updatedSubmissions: number;
+};
+
 export async function resolveOutletForVisit({
   repId,
   outletId,
@@ -345,7 +357,7 @@ export async function mergeOutlet({
     throw new OutletResolutionError("Source and target outlets must be different.");
   }
 
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx): Promise<OutletMergeResult> => {
     const [sourceOutlet, targetOutlet] = await Promise.all([
       tx.outlet.findUnique({ where: { id: sourceOutletId } }),
       tx.outlet.findUnique({ where: { id: targetOutletId } }),
@@ -355,10 +367,47 @@ export async function mergeOutlet({
       throw new OutletResolutionError("Could not find both outlets for merge.");
     }
 
-    await tx.visit.updateMany({ where: { outletId: sourceOutletId }, data: { outletId: targetOutletId } });
-    await tx.visitReport.updateMany({ where: { outletId: sourceOutletId }, data: { outletId: targetOutletId } });
-    await tx.outletSubmission.updateMany({
-      where: { createdOutletId: sourceOutletId },
+    if (targetOutlet.verificationStatus === "REJECTED") {
+      throw new OutletResolutionError("Cannot merge into a rejected outlet.");
+    }
+
+    const [affectedVisits, affectedReports, sourceAliases] = await Promise.all([
+      tx.visit.findMany({ where: { outletId: sourceOutletId }, select: { id: true } }),
+      tx.visitReport.findMany({
+        where: { outletId: sourceOutletId },
+        select: { id: true, visitId: true, title: true, retrievalText: true },
+      }),
+      tx.outletAlias.findMany({ where: { outletId: sourceOutletId } }),
+    ]);
+    const affectedVisitIds = affectedVisits.map((visit) => visit.id);
+    const affectedReportIds = affectedReports.map((report) => report.visitId);
+
+    const movedVisits = await tx.visit.updateMany({
+      where: { outletId: sourceOutletId },
+      data: { outletId: targetOutletId },
+    });
+
+    for (const report of affectedReports) {
+      await tx.visitReport.update({
+        where: { id: report.id },
+        data: {
+          outletId: targetOutletId,
+          title: retargetReportTitle(report.title, targetOutlet.name),
+          retrievalText: retargetReportText(report.retrievalText, {
+            sourceOutlet,
+            targetOutlet,
+          }),
+        },
+      });
+    }
+
+    const updatedSubmissions = await tx.outletSubmission.updateMany({
+      where: {
+        OR: [
+          { createdOutletId: sourceOutletId },
+          { matchedOutletId: sourceOutletId },
+        ],
+      },
       data: {
         status: "MERGED",
         matchedOutletId: targetOutletId,
@@ -387,13 +436,35 @@ export async function mergeOutlet({
       },
     });
 
-    await upsertOutletAlias(tx, targetOutletId, sourceOutlet.name, submissionId ?? null);
-    await upsertOutletAlias(tx, targetOutletId, normalizeOutletName(sourceOutlet.name), submissionId ?? null);
+    const aliasInputs = [
+      { aliasName: sourceOutlet.name, sourceSubmissionId: submissionId ?? null },
+      ...sourceAliases.map((alias) => ({
+        aliasName: alias.aliasName,
+        sourceSubmissionId: alias.sourceSubmissionId,
+      })),
+    ];
+    let copiedAliases = 0;
+    for (const alias of aliasInputs) {
+      const result = await upsertOutletAlias(tx, targetOutletId, alias.aliasName, alias.sourceSubmissionId ?? null);
+      if (result) copiedAliases += 1;
+    }
 
-    return tx.outlet.findUniqueOrThrow({
+    const outlet = await tx.outlet.findUniqueOrThrow({
       where: { id: targetOutletId },
       include: { _count: { select: { visits: true } } },
     });
+
+    return {
+      outlet,
+      sourceOutletId,
+      targetOutletId,
+      affectedVisitIds,
+      affectedReportIds,
+      movedVisits: movedVisits.count,
+      retargetedReports: affectedReports.length,
+      copiedAliases,
+      updatedSubmissions: updatedSubmissions.count,
+    };
   });
 }
 
@@ -614,6 +685,33 @@ function toRadians(value: number): number {
 
 function roundScore(value: number): number {
   return Math.round(value * 1000) / 1000;
+}
+
+function retargetReportTitle(title: string, targetOutletName: string): string {
+  return title.replace(/^.+? visit compliance/i, `${targetOutletName} visit compliance`);
+}
+
+function retargetReportText(
+  retrievalText: string,
+  {
+    sourceOutlet,
+    targetOutlet,
+  }: {
+    sourceOutlet: Outlet;
+    targetOutlet: Outlet;
+  },
+): string {
+  const lines = retrievalText.split("\n");
+  const nextLines = lines.map((line) => {
+    if (line.startsWith("Outlet:")) return `Outlet: ${targetOutlet.name}`;
+    if (line.startsWith("Outlet ID:")) return `Outlet ID: ${targetOutlet.id}`;
+    return line;
+  });
+  const mergeNote = `Merged Duplicate Outlet: ${sourceOutlet.name} (${sourceOutlet.id})`;
+  if (!nextLines.some((line) => line === mergeNote)) {
+    nextLines.push(mergeNote);
+  }
+  return nextLines.join("\n");
 }
 
 function stringOrNull(value: unknown): string | null {
