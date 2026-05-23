@@ -16,6 +16,26 @@ All app APIs use session auth through `requireApiSession`.
 
 ## Product APIs
 
+```mermaid
+flowchart TB
+  API[Next.js API routes]
+  Auth[Auth and RBAC]
+  Visit[Visit APIs]
+  Outlet[Outlet APIs]
+  Dashboard[Dashboard and Ops APIs]
+  Assistant[Assistant API]
+  DB[(PostgreSQL)]
+  Queue[(Redis / BullMQ)]
+
+  API --> Auth
+  Auth --> Visit --> DB
+  Auth --> Outlet --> DB
+  Auth --> Dashboard --> DB
+  Auth --> Assistant --> DB
+  Visit --> Queue
+  Outlet --> Queue
+```
+
 ### Visits
 
 | Method | Route | Auth | Purpose |
@@ -80,6 +100,20 @@ Visit list query params:
 Protected with `x-api-key` when configured.
 
 ## Core Tables
+
+```mermaid
+erDiagram
+  User ||--o{ Visit : creates
+  User ||--o{ OutletSubmission : submits
+  Outlet ||--o{ Visit : receives
+  Outlet ||--o{ OutletAlias : has
+  Outlet ||--o{ OutletSubmission : matches
+  Visit ||--o{ VisitImage : has
+  Visit ||--o| AIResult : produces
+  Visit ||--o| VisitReport : produces
+  Visit ||--o{ FraudSignal : has
+  Visit ||--o{ EventLog : emits
+```
 
 | Table | Primary purpose |
 | --- | --- |
@@ -149,4 +183,3 @@ External systems do not cascade automatically:
 
 - Pinecone vectors must be explicitly deleted or overwritten.
 - Object storage files are not automatically deleted on DB row deletion.
-

@@ -46,6 +46,30 @@ Outlet management prevents duplicate shop creation while keeping the rep flow fa
 
 Code: `lib/outlets.ts`
 
+```mermaid
+flowchart TD
+  A[Rep submits shop name and GPS]
+  B[Normalize name]
+  C[Load non-rejected outlets and aliases]
+  D[Score name similarity]
+  E[Score geo proximity]
+  F[Combine confidence]
+  G{Auto match?}
+  H[Link existing outlet and create alias]
+  I{Possible duplicate?}
+  J[Create submission PENDING_REVIEW]
+  K[Create Outlet UNVERIFIED and NEW_OUTLET submission]
+  L[Supervisor approve, reject, or merge]
+
+  A --> B --> C --> D --> F
+  C --> E --> F
+  F --> G
+  G -- yes --> H
+  G -- no --> I
+  I -- yes --> J --> L
+  I -- no --> K --> L
+```
+
 Input:
 
 - submitted name
@@ -119,6 +143,22 @@ Response includes:
 
 ## Duplicate Merge Semantics
 
+```mermaid
+flowchart LR
+  Source[Duplicate Outlet]
+  Target[Canonical Outlet]
+  Visits[Visits]
+  Reports[Visit Reports]
+  Aliases[Aliases]
+  Pinecone[Pinecone vectors]
+
+  Source -->|mark REJECTED| Target
+  Source -->|move outletId| Visits --> Target
+  Source -->|retarget text and outletId| Reports --> Target
+  Source -->|copy names| Aliases --> Target
+  Reports -->|enqueue reindex| Pinecone
+```
+
 Merging is not deletion.
 
 When `sourceOutletId` is merged into `targetOutletId`:
@@ -146,4 +186,3 @@ Production hardening:
 - Add uniqueness or review constraints around same normalized name within radius.
 - Add supervisor audit notes for merge/reject decisions.
 - Keep alias creation idempotent.
-

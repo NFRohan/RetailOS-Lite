@@ -54,6 +54,28 @@ Retry policy:
 
 Code: `worker/src/jobs/analyzeVisit.ts`
 
+```mermaid
+sequenceDiagram
+  participant Queue as BullMQ analyze_visit
+  participant Worker as Node Worker
+  participant DB as PostgreSQL
+  participant AI as FastAPI AI Service
+  participant Embed as BullMQ embed_visit_report
+  participant DLQ as analyze_visit_dlq
+
+  Queue->>Worker: analyze_visit job
+  Worker->>DB: EventLog ANALYZE_VISIT_STARTED and Visit(ANALYZING)
+  Worker->>DB: load visit, outlet, image
+  Worker->>Worker: fraud checks
+  Worker->>AI: POST /analyze-shelf
+  AI-->>Worker: YOLO, POSM, compliance
+  Worker->>DB: save FraudSignal, AIResult, VisitReport
+  Worker->>DB: Visit(COMPLETE or FLAGGED)
+  Worker->>Embed: enqueue embed_visit_report
+  Worker->>DB: EventLog ANALYZE_VISIT_COMPLETED
+  Worker-->>DLQ: copy payload after terminal failure
+```
+
 ```text
 ANALYZE_VISIT_STARTED
   -> Visit(ANALYZING)
@@ -160,4 +182,3 @@ Important metadata:
 - DLQ replay command is not implemented.
 - Queue cleanup uses bounded `removeOnComplete`/`removeOnFail`, not long-term archival.
 - Report indexing failures do not block visit completion; they surface in ops/failures.
-

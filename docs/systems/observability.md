@@ -6,6 +6,34 @@ Observability demonstrates that the team understands operational AI systems: asy
 
 ## Layers
 
+```mermaid
+flowchart TB
+  Web[Next.js]
+  Worker[Worker]
+  AI[FastAPI AI]
+  EventLog[(EventLog)]
+  Logs[(JSON log files)]
+  Metrics[Prometheus metrics]
+  Sentry[Sentry]
+  Grafana[Grafana LGTM]
+  Ops[/supervisor/ops]
+
+  Web --> EventLog
+  Worker --> EventLog
+  AI --> Logs
+  Web --> Logs
+  Worker --> Logs
+  Web --> Metrics
+  Worker --> Metrics
+  AI --> Metrics
+  Web --> Sentry
+  Worker --> Sentry
+  AI --> Sentry
+  EventLog --> Ops
+  Logs --> Grafana
+  Metrics --> Grafana
+```
+
 | Layer | Purpose |
 | --- | --- |
 | `EventLog` | Product-native audit timeline |
@@ -154,4 +182,3 @@ Session replay and aggressive profiling are intentionally disabled.
 - Tempo tracing is lightweight; the project avoids enterprise OTEL complexity.
 - The ops page should remain bounded and polling-aware to avoid becoming the source of load.
 - Sentry sampling should stay low for sprint/demo traffic.
-

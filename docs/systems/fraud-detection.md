@@ -8,6 +8,29 @@ Fraud detection identifies suspicious visit submissions while avoiding overzealo
 
 Fraud runs inside the worker during `analyze_visit`, before AI service analysis:
 
+```mermaid
+flowchart TD
+  Visit[Visit with image, GPS, timestamp]
+  Hash[SHA-256 exact hash]
+  PHash[Perceptual dHash]
+  GPS[Outlet vs check-in GPS]
+  Time[Client/server timestamp]
+  EXIF[EXIF GPS and capture time]
+  Signals[FraudSignal rows]
+  Metadata[VisitImage metadata]
+  Risk[Dashboard risk status]
+
+  Visit --> Hash --> Signals
+  Visit --> PHash --> Signals
+  Visit --> GPS --> Signals
+  Visit --> Time --> Signals
+  Visit --> EXIF --> Signals
+  Hash --> Metadata
+  PHash --> Metadata
+  EXIF --> Metadata
+  Signals --> Risk
+```
+
 ```text
 Worker analyze_visit
   -> runContextualFraudChecks
@@ -161,4 +184,3 @@ Reason:
 - Add replayable fraud test fixtures.
 - Consider device fingerprinting only with explicit privacy review.
 - Persist raw signal computation details in `metadata`, not in user-facing text only.
-

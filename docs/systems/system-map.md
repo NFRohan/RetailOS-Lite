@@ -13,6 +13,36 @@ RetailOS Lite is an AI-native retail execution workflow:
 
 ## Runtime Topology
 
+```mermaid
+flowchart TB
+  Browser[Browser: Rep PWA and Supervisor UI]
+  Next[Next.js App Router: UI, APIs, Auth, Prisma]
+  DB[(PostgreSQL)]
+  Redis[(Redis / BullMQ)]
+  Storage[(Image Storage)]
+  Worker[Node Worker]
+  AI[FastAPI AI Service]
+  Modal[Modal GPU YOLO]
+  OpenAI[OpenAI Vision, Chat, Embeddings]
+  Pinecone[(Pinecone)]
+  Obs[EventLog, Sentry, LGTM]
+
+  Browser --> Next
+  Next --> DB
+  Next --> Storage
+  Next --> Redis
+  Redis --> Worker
+  Worker --> DB
+  Worker --> Storage
+  Worker --> AI
+  AI --> Modal
+  AI --> OpenAI
+  AI --> Pinecone
+  Next --> Obs
+  Worker --> Obs
+  AI --> Obs
+```
+
 ```text
 Browser
   - Rep PWA flow
@@ -126,4 +156,3 @@ Worker embed_visit_report
 - Fraud and compliance decisions must expose reasons.
 - Local Docker demo must work without cloud deployment.
 - External services must be swappable through env config.
-

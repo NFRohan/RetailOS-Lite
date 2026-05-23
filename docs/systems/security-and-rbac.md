@@ -6,6 +6,21 @@ Security is sprint-pragmatic but real: authenticated users, server-side role che
 
 ## Authentication
 
+```mermaid
+flowchart LR
+  Browser[Browser]
+  Auth[Auth.js session]
+  API[Next.js API route]
+  RBAC[requireApiSession]
+  DB[(PostgreSQL)]
+  AI[FastAPI AI service]
+
+  Browser --> Auth --> API --> RBAC
+  RBAC -->|allowed| DB
+  RBAC -->|forbidden| Deny[401 or 403]
+  API -->|x-api-key| AI
+```
+
 Auth is implemented with Auth.js/NextAuth.
 
 Seeded demo users:
@@ -137,4 +152,3 @@ Important secrets:
 - Keep AI service private or API-key protected.
 - Do not expose MinIO admin console publicly.
 - Rotate OpenAI/Pinecone/Twilio keys after demos if shared.
-

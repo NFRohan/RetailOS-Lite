@@ -17,6 +17,30 @@ The supervisor assistant answers operational questions over previous visits. It 
 
 ## Query Flow
 
+```mermaid
+sequenceDiagram
+  participant UI as Supervisor Chat UI
+  participant Next as Next.js /api/assistant/query
+  participant DB as PostgreSQL
+  participant AI as FastAPI /assistant/query
+  participant OpenAI as OpenAI
+  participant Pinecone as Pinecone
+
+  UI->>Next: question
+  Next->>DB: build exact VisitReport context
+  alt exact operational no-match
+    Next-->>UI: exact no-match answer
+  else needs AI answer
+    Next->>AI: question + exactContext + topK
+    AI->>OpenAI: embed question
+    AI->>Pinecone: vector query
+    AI->>OpenAI: grounded JSON answer
+    AI-->>Next: answer, citations, matches
+    Next->>DB: EventLog ASSISTANT_QUERY_COMPLETED
+    Next-->>UI: answer
+  end
+```
+
 ```text
 Supervisor asks question
   -> POST /api/assistant/query
@@ -60,6 +84,17 @@ Each exact context item includes:
 The context is built from the latest `VisitReport` rows with joined visit, outlet, AI result, and fraud signals.
 
 ## Report Indexing
+
+```mermaid
+flowchart LR
+  Report[VisitReport]
+  Queue[embed_visit_report]
+  AI[FastAPI /rag/index-report]
+  Embed[OpenAI embedding]
+  Vector[(Pinecone vector)]
+
+  Report --> Queue --> AI --> Embed --> Vector
+```
 
 Every analyzed visit creates a `VisitReport`:
 
@@ -183,4 +218,3 @@ When duplicate outlets are merged:
 - No DLQ replay for failed embedding jobs.
 - No pgvector mirror inside Postgres.
 - The intent parser is pragmatic, not a full semantic query planner.
-

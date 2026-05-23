@@ -19,6 +19,23 @@ All supervisor routes are intended for `SUPERVISOR` or `ADMIN`.
 
 ## Overview Dashboard
 
+```mermaid
+flowchart LR
+  UI[Supervisor UI]
+  Dashboard[/GET /api/dashboard/]
+  Visits[/GET /api/visits/]
+  Detail[/GET /api/visits/:id/]
+  Ops[/GET /api/ops/]
+  DB[(PostgreSQL)]
+  Redis[(BullMQ)]
+
+  UI --> Dashboard --> DB
+  UI --> Visits --> DB
+  UI --> Detail --> DB
+  UI --> Ops --> DB
+  Ops --> Redis
+```
+
 API: `GET /api/dashboard?range=7d&tz=Asia/Dhaka`
 
 The endpoint returns:
@@ -147,4 +164,3 @@ This page is designed for demo storytelling: it makes the async AI workflow visi
 - Supervisor settings page is intentionally not implemented.
 - Dashboard time-series are one-day aggregates in Postgres, not a separate OLAP store.
 - Fraud severity rollup is not shown as a separate model; UI focuses on count and reason display.
-

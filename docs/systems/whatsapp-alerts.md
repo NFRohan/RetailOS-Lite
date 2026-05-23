@@ -6,6 +6,21 @@ WhatsApp alerts are a demo bonus integration. They notify supervisors when field
 
 ## Current Alert Types
 
+```mermaid
+flowchart TD
+  NewOutlet[New or ambiguous outlet]
+  Fraud[Fraud signal detected]
+  AlertService[WhatsApp alert wrapper]
+  Twilio[Twilio WhatsApp]
+  Supervisor[Supervisor phone]
+  EventLog[(EventLog)]
+
+  NewOutlet --> AlertService
+  Fraud --> AlertService
+  AlertService --> Twilio --> Supervisor
+  Fraud --> EventLog
+```
+
 | Trigger | Purpose |
 | --- | --- |
 | New outlet approval needed | Rep creates or submits a new/ambiguous outlet |
@@ -90,4 +105,3 @@ npm run test:whatsapp:fraud
 - Store only message SID and operational metadata, not full PII-heavy message bodies.
 - Consider alert throttling if fraud volume grows.
 - Alerts should complement, not replace, dashboard/EventLog state.
-

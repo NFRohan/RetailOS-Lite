@@ -13,6 +13,29 @@ The image intelligence stack converts one shelf image into structured retail exe
 
 ## Services
 
+```mermaid
+flowchart TB
+  Worker[Worker analyze_visit]
+  API[FastAPI /analyze-shelf]
+  Image[Resolved shelf image]
+  YOLO[YOLO local or Modal]
+  Overlay[Overlay renderer]
+  Vision[OpenAI POSM vision]
+  Rules[Compliance rules]
+  Result[Structured ShelfAnalysisResponse]
+
+  Worker --> API
+  API --> Image
+  Image --> YOLO
+  YOLO --> Overlay
+  YOLO --> Vision
+  YOLO --> Rules
+  Vision --> Rules
+  Rules --> Result
+  Overlay --> Result
+  Result --> Worker
+```
+
 | Component | Code | Purpose |
 | --- | --- | --- |
 | FastAPI routes | `ai_service/app/main.py` | AI service API |
@@ -161,4 +184,3 @@ If `RETAILOS_YOLO_FALLBACK_LOCAL=true`, Modal failures can fall back to local in
 - YOLO count accuracy is not perfect; the product story should frame YOLO as product/competitor grounding and OpenAI as visual context/POSM reasoning.
 - Compliance should remain rule-based for explainability.
 - Future work could add calibration datasets, confidence thresholds per class, and human review feedback loops.
-

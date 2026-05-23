@@ -6,6 +6,36 @@ This project is currently optimized for a local Docker demo while keeping cloud 
 
 ## Demo Compose
 
+```mermaid
+flowchart TB
+  Web[web: Next.js]
+  Worker[worker: BullMQ]
+  AI[ai-service: FastAPI]
+  Postgres[(postgres)]
+  Redis[(redis)]
+  Minio[(minio)]
+  Grafana[Grafana]
+  Prom[Prometheus]
+  Loki[Loki]
+  Tempo[Tempo]
+  Promtail[Promtail]
+
+  Web --> Postgres
+  Web --> Redis
+  Web --> Minio
+  Worker --> Postgres
+  Worker --> Redis
+  Worker --> AI
+  AI --> Minio
+  Prom --> Web
+  Prom --> Worker
+  Prom --> AI
+  Promtail --> Loki
+  Grafana --> Prom
+  Grafana --> Loki
+  Grafana --> Tempo
+```
+
 Main command:
 
 ```powershell
@@ -139,4 +169,3 @@ docker compose -f docker-compose.demo.yml exec worker npm run rag:index-reports 
 - Add queue replay tooling for DLQ.
 - Add backup/restore story for Postgres and object storage.
 - Add CI checks for build, worker types, and Python compile/tests.
-

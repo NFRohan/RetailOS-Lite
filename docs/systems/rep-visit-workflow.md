@@ -24,6 +24,29 @@ The rep flow captures field execution evidence quickly: outlet identity, GPS che
 
 ## Creation Flow
 
+```mermaid
+sequenceDiagram
+  participant Rep as Rep Browser
+  participant API as Next.js API
+  participant DB as PostgreSQL
+  participant Store as Image Storage
+  participant Queue as BullMQ
+  participant Worker as Worker
+
+  Rep->>API: POST /api/visits
+  API->>DB: resolve outlet and create Visit(PENDING)
+  API-->>Rep: visit id
+  Rep->>API: POST /api/visits/:id/images
+  API->>Store: write shelf image
+  API->>DB: create VisitImage and EventLog
+  API-->>Rep: image record
+  Rep->>API: POST /api/visits/:id/submit
+  API->>DB: Visit(ANALYZING)
+  API->>Queue: enqueue analyze_visit
+  Queue-->>Worker: async job
+  API-->>Rep: status ANALYZING
+```
+
 ```text
 Rep enters/searches shop name
   -> browser captures GPS
@@ -148,4 +171,3 @@ Retry policy:
 - The flow does not support multi-image visits.
 - The upload path still streams through the app server; production should prefer direct-to-bucket signed uploads.
 - Offline conflict resolution is intentionally simple: client idempotency, one image, retryable error classification.
-

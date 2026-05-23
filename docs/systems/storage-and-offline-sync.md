@@ -8,6 +8,22 @@ Storage and offline sync keep the rep workflow resilient: images persist outside
 
 Code: `lib/storage.ts`
 
+```mermaid
+flowchart TD
+  Browser[Browser upload]
+  API[POST /api/visits/:id/images]
+  Driver{IMAGE_STORAGE_DRIVER}
+  Local[public/uploads]
+  S3[S3 compatible bucket]
+  DB[(VisitImage)]
+  Worker[Worker reads imagePath or imageUrl]
+
+  Browser --> API --> Driver
+  Driver -- local --> Local --> DB
+  Driver -- s3 --> S3 --> DB
+  DB --> Worker
+```
+
 Supported drivers:
 
 | Driver | Env | Use case |
@@ -67,6 +83,22 @@ Demo compose includes MinIO and bucket initialization.
 ## Offline Sync
 
 Code:
+
+```mermaid
+sequenceDiagram
+  participant Browser as Rep Browser
+  participant IDB as IndexedDB
+  participant API as Next.js API
+  participant Queue as BullMQ
+
+  Browser->>IDB: save queued visit and one photo
+  Browser->>Browser: wait for online
+  Browser->>API: POST /api/visits
+  Browser->>API: POST /api/visits/:id/images
+  Browser->>API: POST /api/visits/:id/submit
+  API->>Queue: enqueue analyze_visit
+  Browser->>IDB: delete synced item
+```
 
 - `lib/offline-visits.ts`
 - `components/offline-visit-sync-provider.tsx`
@@ -134,4 +166,3 @@ If a visit already exists for the same rep and client id:
 - Multi-image offline sync is intentionally out of scope.
 - Image compression/thumbnail generation should be added before real deployment.
 - IndexedDB data is not secure storage; do not store secrets there.
-
