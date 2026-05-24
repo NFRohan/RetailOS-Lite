@@ -15,6 +15,8 @@ The supervisor assistant answers operational questions over previous visits. It 
 | AI service | `ai_service/app/rag.py` | Embeddings, Pinecone query, GPT answer |
 | Index worker | `worker/src/queue.ts` | `embed_visit_report` consumer |
 
+The chat input sends on `Enter`, inserts a newline with `Shift+Enter`, and persists recent conversation state locally so tab switches do not reset the working thread.
+
 ## Query Flow
 
 ```mermaid

@@ -280,7 +280,7 @@ Show:
 - worker health
 - analyze and embedding queues
 - failed jobs
-- average latency chip
+- workflow average latency chip
 - collapsible processing timelines
 - stage badges
 - recent failures
@@ -417,4 +417,3 @@ Say instead:
 Use this if nerves hit:
 
 > I will show this as an end-to-end retail execution workflow. First, a rep submits shelf evidence from the field. That request stays fast because AI runs async in BullMQ workers. Then the worker performs fraud checks, calls our FastAPI AI service for YOLO and OpenAI POSM analysis, saves explainable compliance results, and indexes a visit report for the assistant. On the supervisor side, we review compliance, fraud, outlet verification, RAG insights, and ops telemetry.
-

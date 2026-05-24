@@ -96,10 +96,12 @@ Shows:
 - queue depth
 - failed jobs
 - assistant query count
-- average latency chip
+- workflow average latency chip
 - per-stage latency chips
 - recent failures
 - collapsible processing timelines
+
+The headline latency chip uses end-to-end visit timeline duration. Per-stage chips use EventLog latency samples, so workflow time and stage time are intentionally shown separately.
 
 The page works without Grafana because it uses `EventLog` and BullMQ directly.
 

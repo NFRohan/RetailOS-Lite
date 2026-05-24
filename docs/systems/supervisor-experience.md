@@ -54,7 +54,7 @@ Implementation details:
 
 - Uses bounded recent visit queries.
 - Uses SQL daily aggregates for time-series cards.
-- Safe visit rate means no actionable fraud, POSM present, and compliance at least `70`.
+- Clean visit rate means no fraud, POSM present, and compliance at least `70`.
 - Fraud count excludes `IMAGE_HASHED`.
 
 ## Visit Logs
@@ -153,8 +153,8 @@ Shows:
 - Failed jobs.
 - Recent operational events.
 - Collapsible processing timelines.
-- Average latency chip.
-- Per-stage latency chips.
+- Workflow average latency chip, computed from visit timeline duration.
+- Per-stage latency chips, computed from EventLog latency samples.
 - Assistant query count.
 
 This page is designed for demo storytelling: it makes the async AI workflow visible without requiring Grafana.
