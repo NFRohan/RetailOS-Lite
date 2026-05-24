@@ -85,6 +85,13 @@ export async function sendOutletApprovalAlert(
     return { ok: false, error: "not_configured" };
   }
 
+  console.info("[whatsapp-alerts] Attempting outlet approval WhatsApp send", {
+    alertType: input.alertType,
+    storeName: input.storeName,
+    repName: input.repName,
+    to: config.to,
+  });
+
   const body = formatAlertBody(input, config.appPublicUrl);
   const params = new URLSearchParams({
     To: config.to,

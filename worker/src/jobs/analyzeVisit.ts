@@ -146,7 +146,9 @@ export async function analyzeVisit(
 
     if (fraudSignals.length > 0) {
       const alertAlreadySent = await repository.hasVisitEvent(visit.id, "WHATSAPP_FRAUD_ALERT_SENT");
-      if (!alertAlreadySent) {
+      if (alertAlreadySent) {
+        console.info("[fraud-whatsapp-alerts] Skipped: alert already sent for visit", { visitId: visit.id });
+      } else {
         const alertResult = await sendFraudAlert({
           visitId: visit.id,
           storeName: visit.outlet.name,

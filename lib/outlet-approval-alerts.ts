@@ -18,6 +18,12 @@ function resolveAlertType(submissionStatus?: SubmissionStatus): OutletApprovalAl
 }
 
 export async function notifyOutletApprovalNeeded(input: NotifyOutletApprovalInput): Promise<void> {
+  console.info("[outlet-approval-alerts] Attempting WhatsApp alert", {
+    storeName: input.storeName,
+    repId: input.repId,
+    submissionStatus: input.submissionStatus ?? "new_outlet",
+  });
+
   const rep = await prisma.user.findUnique({
     where: { id: input.repId },
     select: { name: true },

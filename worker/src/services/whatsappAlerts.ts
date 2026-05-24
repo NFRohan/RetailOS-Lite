@@ -126,8 +126,17 @@ async function sendWhatsAppMessage(body: string): Promise<WhatsAppSendResult> {
 export async function sendFraudAlert(input: SendFraudAlertInput): Promise<WhatsAppSendResult> {
   const config = getTwilioWhatsAppConfig();
   if (!config) {
+    console.info("[whatsapp-alerts] Skipped: Twilio WhatsApp is disabled or not configured.");
     return { ok: false, error: "not_configured" };
   }
+
+  console.info("[fraud-whatsapp-alerts] Attempting WhatsApp alert", {
+    visitId: input.visitId,
+    storeName: input.storeName,
+    repName: input.repName,
+    fraudSignalCount: input.fraudSignals.length,
+    to: config.to,
+  });
 
   return sendWhatsAppMessage(formatFraudAlertBody(input, config.appPublicUrl));
 }
