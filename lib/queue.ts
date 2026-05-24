@@ -10,6 +10,10 @@ export type AnalyzeVisitJobData = {
   useLlm?: boolean;
 };
 
+export type EmbedVisitReportJobData = {
+  visitId: string;
+};
+
 function env(name: string, fallback: string): string {
   const raw = process.env[name];
   return raw && raw.trim() ? raw : fallback;
@@ -18,10 +22,12 @@ function env(name: string, fallback: string): string {
 export const queueConfig = {
   redisUrl: env("REDIS_URL", "redis://127.0.0.1:6379"),
   analyzeVisitQueueName: env("ANALYZE_VISIT_QUEUE", "analyze_visit"),
+  embedVisitReportQueueName: env("EMBED_VISIT_REPORT_QUEUE", "embed_visit_report"),
 };
 
 let redisConnection: Redis | null = null;
 let analyzeQueue: Queue<AnalyzeVisitJobData> | null = null;
+let embedQueue: Queue<EmbedVisitReportJobData> | null = null;
 
 export function getRedisConnection() {
   if (!redisConnection) {
@@ -39,6 +45,15 @@ export function getAnalyzeVisitQueue() {
     });
   }
   return analyzeQueue;
+}
+
+export function getEmbedVisitReportQueue() {
+  if (!embedQueue) {
+    embedQueue = new Queue<EmbedVisitReportJobData>(queueConfig.embedVisitReportQueueName, {
+      connection: getRedisConnection(),
+    });
+  }
+  return embedQueue;
 }
 
 export async function enqueueAnalyzeVisit(visitId: string, useLlm = true, correlationId = createCorrelationId("visit")) {
@@ -66,4 +81,30 @@ export async function enqueueAnalyzeVisit(visitId: string, useLlm = true, correl
   });
   metrics.stageLatency.labels("queue", "success").observe(Date.now() - started);
   return traceId;
+}
+
+export async function enqueueVisitReportIndex(visitId: string, correlationId = createCorrelationId("embed")) {
+  const queue = getEmbedVisitReportQueue();
+  const started = Date.now();
+  await queue.add(
+    "embed_visit_report",
+    { visitId },
+    {
+      jobId: `embed-${visitId}`,
+      attempts: 3,
+      backoff: { type: "exponential", delay: 2000 },
+      removeOnComplete: 100,
+      removeOnFail: 100,
+    },
+  );
+  logInfo("visit report indexing queued", {
+    correlationId,
+    visitId,
+    stage: "embedding",
+    status: "queued",
+    latencyMs: Date.now() - started,
+    queue: queueConfig.embedVisitReportQueueName,
+  });
+  metrics.stageLatency.labels("embedding", "queued").observe(Date.now() - started);
+  return correlationId;
 }

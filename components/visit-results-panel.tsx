@@ -48,25 +48,15 @@ export function VisitResultsPanel({ visit, outcome }: Props) {
     outcome?.fraudSignals ??
     visit.fraudSignals.map((s) => ({ type: s.type, severity: s.severity, message: s.message }))
   ).filter((signal) => signal.type !== "IMAGE_HASHED");
+  const complianceReasons = (outcome?.complianceReasons ?? ["Analysis did not return detailed compliance reasons."]).filter(
+    (reason) => !isCountAuditReason(reason),
+  );
 
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
       <div className="space-y-6">
         <Card className="border-[#d6ddea] bg-white shadow-[0_1px_3px_rgba(2,43,58,0.05)]">
-          <CardHeader className="flex flex-row items-center justify-between pb-3">
-            <CardTitle className="text-base text-navy">Visual Analysis</CardTitle>
-            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              <span className="inline-flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-rose-500" />
-                Fraud Risk
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-teal" />
-                AI Processed
-              </span>
-            </div>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="p-5">
             <ImageCompareSlider rawUrl={rawUrl} overlayUrl={overlayUrl} />
           </CardContent>
         </Card>
@@ -79,14 +69,12 @@ export function VisitResultsPanel({ visit, outcome }: Props) {
             </CardHeader>
             <CardContent>
               <ul className="space-y-2">
-                {(outcome?.complianceReasons ?? ["Analysis did not return detailed compliance reasons."]).map(
-                  (reason, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-teal" />
-                      {reason}
-                    </li>
-                  ),
-                )}
+                {complianceReasons.map((reason, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-teal" />
+                    {reason}
+                  </li>
+                ))}
               </ul>
             </CardContent>
           </Card>
@@ -109,10 +97,9 @@ export function VisitResultsPanel({ visit, outcome }: Props) {
             <PackageCheck className="h-4 w-4 text-teal" />
             <CardTitle className="text-base text-navy">POSM Details</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-2">
+          <CardContent className="grid gap-3">
             <PosmDetail label="Olympic POSM" present={outcome?.posm.detected === true} />
-            <PosmDetail label="Shelf Evidence" present={outcome?.posm.detected === true} />
-            <p className="md:col-span-2 text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               {outcome?.posm.evidence ?? "POSM analysis not available."}
             </p>
           </CardContent>
@@ -134,7 +121,6 @@ export function VisitResultsPanel({ visit, outcome }: Props) {
             <blockquote className="rounded-lg bg-[#eef2fb] p-4 text-sm leading-relaxed text-navy/80">
               &quot;{summary || "No AI summary available yet."}&quot;
             </blockquote>
-            <button className="mt-3 text-xs font-semibold text-teal hover:underline">View full transcript</button>
           </CardContent>
         </Card>
 
@@ -170,6 +156,10 @@ export function VisitResultsPanel({ visit, outcome }: Props) {
       </aside>
     </div>
   );
+}
+
+function isCountAuditReason(reason: string): boolean {
+  return reason.toLowerCase().includes("openai visual audit adjusted");
 }
 
 function HighSeverityFraudCard({ signals }: { signals: Array<{ type: string; severity: string; message: string }> }) {

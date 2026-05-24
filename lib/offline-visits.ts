@@ -6,6 +6,7 @@ export const OFFLINE_VISITS_CHANGED_EVENT = "retailos:offline-visits-changed";
 const DB_NAME = "retailos-lite-offline";
 const DB_VERSION = 1;
 const VISIT_STORE = "visitSubmissions";
+const INTERRUPTED_SYNC_AFTER_MS = 30_000;
 
 export type OfflineVisitStatus = "queued" | "syncing" | "failed";
 
@@ -121,7 +122,7 @@ export async function listOfflineVisitSubmissions(): Promise<OfflineVisitSubmiss
     const request = db.transaction(VISIT_STORE, "readonly").objectStore(VISIT_STORE).getAll();
     request.onsuccess = () => {
       resolve(
-        (request.result as OfflineVisitSubmission[]).sort(
+        (request.result as OfflineVisitSubmission[]).map(markInterruptedSyncForRetry).sort(
           (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
         ),
       );
@@ -172,6 +173,19 @@ export async function syncOfflineVisitQueue(options: OfflineQueueSyncOptions = {
   }
 
   return result;
+}
+
+function markInterruptedSyncForRetry(submission: OfflineVisitSubmission): OfflineVisitSubmission {
+  if (submission.status !== "syncing") return submission;
+
+  const updatedAtMs = Date.parse(submission.updatedAt);
+  if (!Number.isFinite(updatedAtMs) || Date.now() - updatedAtMs < INTERRUPTED_SYNC_AFTER_MS) return submission;
+
+  return {
+    ...submission,
+    status: "queued",
+    lastError: "Previous sync was interrupted; retrying when online.",
+  };
 }
 
 export async function submitVisitOnline(input: OnlineVisitSubmissionInput): Promise<VisitSyncResult> {

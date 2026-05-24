@@ -85,25 +85,25 @@ model OutletAlias {
 }
 
 model OutletSubmission {
-  id               String                 @id @default(cuid())
-  repId            String
-  submittedName    String
-  normalizedName   String
-  submittedLat     Float?
-  submittedLng     Float?
-  matchedOutletId  String?
-  createdOutletId  String?
-  visitId          String?
-  matchConfidence  Float?
-  status           OutletSubmissionStatus
-  possibleMatches  Json?
-  reviewedById     String?
-  reviewedAt       DateTime?
-  createdAt        DateTime               @default(now())
-  rep              User                   @relation("RepOutletSubmissions", fields: [repId], references: [id])
-  reviewedBy       User?                  @relation("ReviewedOutletSubmissions", fields: [reviewedById], references: [id])
-  matchedOutlet    Outlet?                @relation("MatchedOutletSubmissions", fields: [matchedOutletId], references: [id])
-  createdOutlet    Outlet?                @relation("CreatedOutletSubmissions", fields: [createdOutletId], references: [id])
+  id              String                 @id @default(cuid())
+  repId           String
+  submittedName   String
+  normalizedName  String
+  submittedLat    Float?
+  submittedLng    Float?
+  matchedOutletId String?
+  createdOutletId String?
+  visitId         String?
+  matchConfidence Float?
+  status          OutletSubmissionStatus
+  possibleMatches Json?
+  reviewedById    String?
+  reviewedAt      DateTime?
+  createdAt       DateTime               @default(now())
+  rep             User                   @relation("RepOutletSubmissions", fields: [repId], references: [id])
+  reviewedBy      User?                  @relation("ReviewedOutletSubmissions", fields: [reviewedById], references: [id])
+  matchedOutlet   Outlet?                @relation("MatchedOutletSubmissions", fields: [matchedOutletId], references: [id])
+  createdOutlet   Outlet?                @relation("CreatedOutletSubmissions", fields: [createdOutletId], references: [id])
 
   @@index([status, createdAt])
   @@index([normalizedName])
@@ -130,6 +130,11 @@ model Visit {
   fraudSignals    FraudSignal[]
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+
+  @@index([createdAt])
+  @@index([repId, createdAt])
+  @@index([outletId, createdAt])
+  @@index([status, createdAt])
 }
 
 model VisitImage {
@@ -141,6 +146,9 @@ model VisitImage {
   metadata  Json?
   visit     Visit    @relation(fields: [visitId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
+
+  @@index([visitId])
+  @@index([imageHash])
 }
 
 model AIResult {
@@ -174,6 +182,9 @@ model VisitReport {
   visit         Visit    @relation(fields: [visitId], references: [id], onDelete: Cascade)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  @@index([outletId])
+  @@index([updatedAt])
 }
 
 model FraudSignal {
@@ -185,6 +196,9 @@ model FraudSignal {
   metadata  Json?
   visit     Visit    @relation(fields: [visitId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
+
+  @@index([visitId])
+  @@index([type, createdAt])
 }
 
 model EventLog {
@@ -196,4 +210,8 @@ model EventLog {
   traceId   String?
   metadata  Json?
   createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([visitId, createdAt])
+  @@index([event, createdAt])
 }

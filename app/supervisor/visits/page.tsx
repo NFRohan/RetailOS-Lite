@@ -10,7 +10,7 @@ import { ComplianceBadge } from "@/components/compliance-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { VisitListItem, VisitLogsResponse } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
-import { CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Search, ShieldAlert, SlidersHorizontal } from "lucide-react";
+import { AlertTriangle, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Search, ShieldAlert, SlidersHorizontal } from "lucide-react";
 
 const PAGE_SIZE = 5;
 
@@ -23,7 +23,8 @@ export default function SupervisorVisitLogsPage() {
   const { data, isLoading } = useQuery<VisitLogsResponse>({
     queryKey: ["visit-logs", deferredQuery, status, page],
     queryFn: () => fetch(visitLogsUrl({ query: deferredQuery, status, page })).then((r) => r.json()),
-    refetchInterval: 5000,
+    refetchInterval: 15000,
+    refetchIntervalInBackground: false,
   });
 
   const visits = data?.items ?? [];
@@ -148,7 +149,7 @@ function VisitLogsTable({ visits }: { visits: VisitListItem[] }) {
             <th className="px-4 py-3">Outlet Name</th>
             <th className="px-4 py-3">Rep Name</th>
             <th className="px-4 py-3 text-center">Compliance Score</th>
-            <th className="px-4 py-3 text-center">Fraud Status</th>
+            <th className="px-4 py-3 text-center">Fraud Signals</th>
             <th className="px-4 py-3 text-right">Action</th>
           </tr>
         </thead>
@@ -168,7 +169,7 @@ function VisitLogsTable({ visits }: { visits: VisitListItem[] }) {
                 <ComplianceBadge score={visit.complianceScore} status={visit.complianceStatus} />
               </td>
               <td className="px-4 py-4 text-center">
-                <RiskBadge visit={visit} />
+                <FraudBadge visit={visit} />
               </td>
               <td className="px-4 py-4 text-right">
                 <Link
@@ -210,8 +211,8 @@ function SegmentButton({
   );
 }
 
-function RiskBadge({ visit }: { visit: VisitListItem }) {
-  if (visit.riskStatus === "HIGH_RISK") {
+function FraudBadge({ visit }: { visit: VisitListItem }) {
+  if (visit.hasHighFraud) {
     return (
       <Badge variant="critical" className="gap-1">
         <ShieldAlert className="h-3.5 w-3.5" />
@@ -219,13 +220,18 @@ function RiskBadge({ visit }: { visit: VisitListItem }) {
       </Badge>
     );
   }
-  if (visit.riskStatus === "REVIEW_NEEDED") {
-    return <Badge variant="warning">Review Needed</Badge>;
+  if (visit.fraudCount > 0) {
+    return (
+      <Badge variant="warning" className="gap-1">
+        <AlertTriangle className="h-3.5 w-3.5" />
+        {visit.fraudCount} signal{visit.fraudCount === 1 ? "" : "s"}
+      </Badge>
+    );
   }
   return (
     <Badge variant="success" className="gap-1">
       <CheckCircle2 className="h-3.5 w-3.5" />
-      Safe
+      No fraud
     </Badge>
   );
 }

@@ -86,13 +86,41 @@ export async function buildAssistantExactContext(question: string): Promise<Assi
   if (intents.fraud) addMatches((report) => actionableFraudSignals(report).length > 0, 30);
   if (intents.review) addMatches((report) => riskStatus(report) !== "SAFE", 30);
 
+  if (isExactListQuestion(intents) && selected.size === 0) {
+    return [];
+  }
+
   if (selected.size === 0) {
     addMatches(() => true, 12);
-  } else if (selected.size < 6) {
+  } else if (selected.size < 6 && !isExactListQuestion(intents)) {
     addMatches(() => true, 10);
   }
 
   return [...selected.values()].slice(0, 20).map(toAssistantContextItem);
+}
+
+export function exactNoMatchAssistantAnswer(question: string): AssistantAnswer | null {
+  const intents = detectIntents(normalize(question));
+  if (!isExactListQuestion(intents)) return null;
+
+  const subject = intents.fraud
+    ? "actionable fraud signals"
+    : intents.posm
+      ? "missing POSM"
+      : intents.compliance
+        ? "failing compliance"
+        : "supervisor review reasons";
+
+  return {
+    answer: `No outlets currently match this exact database query for ${subject}.`,
+    citations: [],
+    matches: [],
+    model: "exact-database",
+    embeddingModel: "not-used",
+    retrievalMode: "exact",
+    warnings: [],
+    exactContextCount: 0,
+  };
 }
 
 export function fallbackAssistantAnswer(
@@ -172,6 +200,10 @@ function detectIntents(normalizedQuestion: string) {
     fraud: includesAny(normalizedQuestion, ["fraud", "duplicate", "gps", "timestamp", "fake", "suspicious"]),
     review: includesAny(normalizedQuestion, ["review", "flagged", "risk", "attention", "problem"]),
   };
+}
+
+function isExactListQuestion(intents: ReturnType<typeof detectIntents>): boolean {
+  return intents.compliance || intents.posm || intents.fraud || intents.review;
 }
 
 function isFailingCompliance(report: VisitReportWithVisit): boolean {

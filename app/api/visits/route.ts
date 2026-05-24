@@ -22,52 +22,48 @@ export async function GET(request: NextRequest) {
   const isSupervisor = session.user.role === "SUPERVISOR" || session.user.role === "ADMIN";
   const searchParams = request.nextUrl.searchParams;
   const paginated = wantsPaginatedVisitLogs(searchParams);
-  const where = visitLogWhere(searchParams, {
+  const baseWhere = visitLogWhere(searchParams, {
     isSupervisor,
     userId: session.user.id,
   });
+  const where = paginated ? withRiskStatus(baseWhere, searchParams.get("status")) : baseWhere;
+
+  if (paginated) {
+    const page = positiveInt(searchParams.get("page"), 1);
+    const pageSize = Math.min(100, positiveInt(searchParams.get("pageSize"), 10));
+    const [total, facets] = await Promise.all([
+      prisma.visit.count({ where }),
+      visitLogFacets(baseWhere),
+    ]);
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const safePage = Math.min(page, totalPages);
+    const visits = await prisma.visit.findMany({
+      where,
+      include: visitListInclude,
+      orderBy: { createdAt: "desc" },
+      skip: (safePage - 1) * pageSize,
+      take: pageSize,
+    });
+
+    return NextResponse.json({
+      items: visits.map(serializeVisitListItem),
+      pagination: {
+        page: safePage,
+        pageSize,
+        total,
+        totalPages,
+      },
+      facets,
+    });
+  }
 
   const visits = await prisma.visit.findMany({
     where,
-    include: {
-      outlet: true,
-      rep: { select: { id: true, name: true, email: true } },
-      images: true,
-      aiResult: true,
-      fraudSignals: true,
-    },
+    include: visitListInclude,
     orderBy: { createdAt: "desc" },
   });
 
-  const serialized = visits.map(serializeVisitListItem);
-  if (!paginated) {
-    return NextResponse.json(serialized);
-  }
-
-  const filtered = filterByRiskStatus(serialized, searchParams.get("status"));
-  const page = positiveInt(searchParams.get("page"), 1);
-  const pageSize = Math.min(100, positiveInt(searchParams.get("pageSize"), 10));
-  const total = filtered.length;
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const safePage = Math.min(page, totalPages);
-  const start = (safePage - 1) * pageSize;
-
-  return NextResponse.json({
-    items: filtered.slice(start, start + pageSize),
-    pagination: {
-      page: safePage,
-      pageSize,
-      total,
-      totalPages,
-    },
-    facets: {
-      all: serialized.length,
-      safe: serialized.filter((visit) => visit.riskStatus === "SAFE").length,
-      flagged: serialized.filter((visit) => visit.riskStatus !== "SAFE").length,
-      reviewNeeded: serialized.filter((visit) => visit.riskStatus === "REVIEW_NEEDED").length,
-      highRisk: serialized.filter((visit) => visit.riskStatus === "HIGH_RISK").length,
-    },
-  });
+  return NextResponse.json(visits.map(serializeVisitListItem));
 }
 
 export async function POST(request: NextRequest) {
@@ -190,18 +186,86 @@ function visitLogWhere(
   return where;
 }
 
-function filterByRiskStatus<T extends { riskStatus: string }>(visits: T[], rawStatus: string | null): T[] {
+const visitListInclude = {
+  outlet: true,
+  rep: { select: { id: true, name: true, email: true } },
+  images: true,
+  aiResult: true,
+  fraudSignals: true,
+} satisfies Prisma.VisitInclude;
+
+async function visitLogFacets(baseWhere: Prisma.VisitWhereInput) {
+  const highRiskWhere = withRiskStatus(baseWhere, "high-risk");
+  const reviewNeededWhere = withRiskStatus(baseWhere, "review-needed");
+  const flaggedWhere = withRiskStatus(baseWhere, "flagged");
+  const safeWhere = withRiskStatus(baseWhere, "safe");
+  const [all, safe, flagged, reviewNeeded, highRisk] = await Promise.all([
+    prisma.visit.count({ where: baseWhere }),
+    prisma.visit.count({ where: safeWhere }),
+    prisma.visit.count({ where: flaggedWhere }),
+    prisma.visit.count({ where: reviewNeededWhere }),
+    prisma.visit.count({ where: highRiskWhere }),
+  ]);
+
+  return { all, safe, flagged, reviewNeeded, highRisk };
+}
+
+function withRiskStatus(baseWhere: Prisma.VisitWhereInput, rawStatus: string | null): Prisma.VisitWhereInput {
   const status = rawStatus?.toLowerCase();
-  if (!status || status === "all" || status === "all-logs") return visits;
-  if (status === "safe") return visits.filter((visit) => visit.riskStatus === "SAFE");
-  if (status === "flagged") return visits.filter((visit) => visit.riskStatus !== "SAFE");
-  if (status === "review" || status === "review-needed") {
-    return visits.filter((visit) => visit.riskStatus === "REVIEW_NEEDED");
-  }
-  if (status === "high-risk" || status === "high") {
-    return visits.filter((visit) => visit.riskStatus === "HIGH_RISK");
-  }
-  return visits;
+  if (!status || status === "all" || status === "all-logs") return baseWhere;
+  if (status === "safe") return andWhere(baseWhere, safeRiskWhere());
+  if (status === "flagged") return andWhere(baseWhere, { NOT: safeRiskWhere() });
+  if (status === "review" || status === "review-needed") return andWhere(baseWhere, reviewRiskWhere());
+  if (status === "high-risk" || status === "high") return andWhere(baseWhere, highRiskWhere());
+  return baseWhere;
+}
+
+function highRiskWhere(): Prisma.VisitWhereInput {
+  return {
+    OR: [
+      { fraudSignals: { some: { type: { not: "IMAGE_HASHED" }, severity: "HIGH" } } },
+      { aiResult: { is: { complianceScore: { lt: 50 } } } },
+    ],
+  };
+}
+
+function reviewRiskWhere(): Prisma.VisitWhereInput {
+  return {
+    OR: [
+      { status: { in: ["FLAGGED", "FAILED"] } },
+      { fraudSignals: { some: { type: { not: "IMAGE_HASHED" } } } },
+      { aiResult: { is: { complianceScore: { lt: 70 } } } },
+      { aiResult: { is: { posm: { path: ["detected"], equals: false } } } },
+      { aiResult: { is: { outcomeSummary: { path: ["posm", "detected"], equals: false } } } },
+    ],
+  };
+}
+
+function safeRiskWhere(): Prisma.VisitWhereInput {
+  return {
+    AND: [
+      { status: { notIn: ["FLAGGED", "FAILED"] } },
+      { fraudSignals: { none: { type: { not: "IMAGE_HASHED" } } } },
+      {
+        OR: [
+          { aiResult: null },
+          { aiResult: { is: { complianceScore: { gte: 70 } } } },
+        ],
+      },
+      {
+        NOT: {
+          OR: [
+            { aiResult: { is: { posm: { path: ["detected"], equals: false } } } },
+            { aiResult: { is: { outcomeSummary: { path: ["posm", "detected"], equals: false } } } },
+          ],
+        },
+      },
+    ],
+  };
+}
+
+function andWhere(...clauses: Prisma.VisitWhereInput[]): Prisma.VisitWhereInput {
+  return { AND: clauses };
 }
 
 function positiveInt(raw: string | null, fallback: number): number {

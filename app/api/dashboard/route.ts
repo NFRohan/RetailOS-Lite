@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireApiSession, ROLE_GROUPS } from "@/lib/rbac";
@@ -45,26 +46,25 @@ export async function GET(request: NextRequest) {
     dailyAggregates(previousStartKey, currentStartKey, timeZone),
   ]);
 
-  const visits = await prisma.visit.findMany({
-    include: {
-      outlet: true,
-      rep: { select: { id: true, name: true, email: true } },
-      images: true,
-      aiResult: true,
-      fraudSignals: true,
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const [flaggedCount, outletsBelowThreshold, recentVisitsRaw, needsAttentionRaw] = await Promise.all([
+    prisma.visit.count({ where: { status: "FLAGGED" } }),
+    countOutletsBelowThreshold(60, currentStartKey, tomorrowKey, timeZone),
+    prisma.visit.findMany({
+      include: visitListInclude,
+      orderBy: { createdAt: "desc" },
+      take: 5,
+    }),
+    prisma.visit.findMany({
+      where: dashboardAttentionWhere(),
+      include: visitListInclude,
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    }),
+  ]);
 
-  const withScores = visits.filter((v) => v.aiResult);
-  const flaggedCount = visits.filter((v) => v.status === "FLAGGED").length;
-  const outletsBelowThreshold = new Set(
-    withScores.filter((v) => (v.aiResult?.complianceScore ?? 100) < 60).map((v) => v.outletId),
-  ).size;
-
-  const serialized = visits.map(serializeVisitListItem);
-  const needsAttention = [...serialized]
-    .filter((v) => v.status === "FLAGGED" || v.hasHighFraud || (v.complianceScore !== null && v.complianceScore < 60))
+  const recentVisits = recentVisitsRaw.map(serializeVisitListItem);
+  const needsAttention = needsAttentionRaw
+    .map(serializeVisitListItem)
     .sort((a, b) => (a.complianceScore ?? 100) - (b.complianceScore ?? 100))
     .slice(0, 5);
   const currentSummary = summarizeTrend(trend);
@@ -96,9 +96,9 @@ export async function GET(request: NextRequest) {
     avgComplianceScore: summary.avgComplianceScore,
     flaggedCount,
     outletsBelowThreshold,
-    visits: serialized,
+    visits: recentVisits,
     needsAttention,
-    recentVisits: serialized.slice(0, 5),
+    recentVisits,
     summary,
     trend: trend.map((point) => ({
       date: point.date,
@@ -110,6 +110,42 @@ export async function GET(request: NextRequest) {
       missingPosm: point.posmMissing,
     })),
   });
+}
+
+const visitListInclude = {
+  outlet: true,
+  rep: { select: { id: true, name: true, email: true } },
+  images: true,
+  aiResult: true,
+  fraudSignals: true,
+} satisfies Prisma.VisitInclude;
+
+function dashboardAttentionWhere(): Prisma.VisitWhereInput {
+  return {
+    OR: [
+      { status: { in: ["FLAGGED", "FAILED"] } },
+      { fraudSignals: { some: { type: { not: "IMAGE_HASHED" } } } },
+      { aiResult: { is: { complianceScore: { lt: 60 } } } },
+    ],
+  };
+}
+
+async function countOutletsBelowThreshold(
+  threshold: number,
+  startDate: string,
+  endExclusiveDate: string,
+  timeZone: string,
+) {
+  const rows = await prisma.$queryRaw<Array<{ count: number | bigint }>>`
+    SELECT count(DISTINCT v."outletId")::int AS count
+    FROM "Visit" v
+    JOIN "AIResult" ar ON ar."visitId" = v.id
+    WHERE ar."complianceScore" < ${threshold}
+      AND ((v."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${timeZone})::date >= ${startDate}::date
+      AND ((v."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${timeZone})::date < ${endExclusiveDate}::date
+  `;
+
+  return Number(rows[0]?.count ?? 0);
 }
 
 async function dailyAggregates(

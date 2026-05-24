@@ -53,8 +53,9 @@ export default function NewVisitPage() {
   const [gpsLoading, setGpsLoading] = useState(false);
   const [photos, setPhotos] = useState<PhotoFile[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const [isOnline, setIsOnline] = useState(true);
+  const [isOnline, setIsOnline] = useState(() => (typeof navigator === "undefined" ? true : navigator.onLine));
   const [error, setError] = useState("");
+  const [queuedOfflineMessage, setQueuedOfflineMessage] = useState("");
 
   const normalizedShopName = shopName.trim();
   const canSearchOutlets = Boolean(isOnline && normalizedShopName.length >= 2 && gps);
@@ -151,12 +152,14 @@ export default function NewVisitPage() {
   async function handleSubmit() {
     setSubmitting(true);
     setError("");
+    setQueuedOfflineMessage("");
     const resolvedOutletId = selectedOutletId || selectedOutlet?.id || undefined;
+    const shouldForceNewOutlet = isOnline && forceNewOutlet && !resolvedOutletId;
     const payload: OfflineVisitPayload = {
       clientVisitId: createClientVisitId(),
       outletName: normalizedShopName,
       outletId: resolvedOutletId,
-      forceNewOutlet: forceNewOutlet && !resolvedOutletId,
+      forceNewOutlet: shouldForceNewOutlet,
       checkInLat: gps?.lat ?? null,
       checkInLng: gps?.lng ?? null,
       clientTimestamp: new Date().toISOString(),
@@ -174,6 +177,14 @@ export default function NewVisitPage() {
     };
 
     try {
+      if (!isOnline) {
+        await queueOfflineVisitSubmission(syncInput);
+        await queryClient.invalidateQueries({ queryKey: ["offline-visits"] });
+        setQueuedOfflineMessage("Saved offline. Keep this tab open or reconnect later; sync will retry automatically.");
+        setSubmitting(false);
+        return;
+      }
+
       const result = await submitMutation.mutateAsync(syncInput);
       await queryClient.invalidateQueries({ queryKey: ["visits"] });
       router.push(`/rep/visits/${result.visitId}`);
@@ -182,7 +193,8 @@ export default function NewVisitPage() {
         try {
           await queueOfflineVisitSubmission(syncInput);
           await queryClient.invalidateQueries({ queryKey: ["offline-visits"] });
-          router.push("/rep/visits?queued=1");
+          setQueuedOfflineMessage("Saved offline after a network failure. Sync will retry automatically when the app is online.");
+          setSubmitting(false);
           return;
         } catch (queueError) {
           setError(queueError instanceof Error ? queueError.message : "Could not save visit offline.");
@@ -216,6 +228,13 @@ export default function NewVisitPage() {
   const canContinueFromOutlet = Boolean(
     normalizedShopName.length >= 2 && gps && (selectedOutletId || forceNewOutlet || canCreateImplicitly),
   );
+  const outletMatchReviewLabel = selectedCandidate
+    ? `${selectedCandidate.name} (${Math.round(selectedCandidate.confidence * 100)}%)`
+    : !isOnline
+      ? "Will resolve against master outlet data when synced"
+      : forceNewOutlet
+        ? "New shop pending supervisor review"
+        : "Server will resolve nearest outlet match";
 
   return (
     <div className="space-y-5">
@@ -255,9 +274,12 @@ export default function NewVisitPage() {
                 onOutletSelect={handleOutletSelect}
                 gps={gps}
                 onLocationCaptured={setGps}
+                isOnline={isOnline}
               />
               <p className="text-xs text-muted-foreground">
-                Pick a store from the list or add a new one. Nearby GPS matching runs when you type a custom name.
+                {isOnline
+                  ? "Pick a store from the list or type a new one. Nearby GPS matching runs as you type."
+                  : "Offline: type the shop name manually. Matching and supervisor verification run when the visit syncs."}
               </p>
             </div>
 
@@ -365,7 +387,7 @@ export default function NewVisitPage() {
 
             {error && <p className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
 
-            <Button className="h-12 w-full rounded-2xl" disabled={!canContinueFromOutlet} onClick={() => setStep(1)}>
+            <Button type="button" className="h-12 w-full rounded-2xl" disabled={!canContinueFromOutlet} onClick={() => setStep(1)}>
               Continue to Photos
             </Button>
           </CardContent>
@@ -394,10 +416,10 @@ export default function NewVisitPage() {
             <PhotoUploader photos={photos} onChange={setPhotos} />
 
             <div className="grid grid-cols-2 gap-3">
-              <Button variant="outline" className="h-12 rounded-2xl" onClick={() => setStep(0)}>
+              <Button type="button" variant="outline" className="h-12 rounded-2xl" onClick={() => setStep(0)}>
                 Back
               </Button>
-              <Button className="h-12 rounded-2xl" disabled={photos.length === 0} onClick={() => setStep(2)}>
+              <Button type="button" className="h-12 rounded-2xl" disabled={photos.length === 0} onClick={() => setStep(2)}>
                 Review
               </Button>
             </div>
@@ -417,11 +439,7 @@ export default function NewVisitPage() {
                 <ReviewRow label="Shop" value={normalizedShopName || "-"} />
                 <ReviewRow
                   label="Outlet Match"
-                  value={
-                    selectedCandidate
-                      ? `${selectedCandidate.name} (${Math.round(selectedCandidate.confidence * 100)}%)`
-                      : "New shop pending supervisor review"
-                  }
+                  value={outletMatchReviewLabel}
                 />
                 <ReviewRow label="GPS" value={gps ? `${gps.lat.toFixed(5)}, ${gps.lng.toFixed(5)}` : "Not captured"} />
                 <ReviewRow label="Image" value={photos.length > 0 ? "1 shelf image" : "Not uploaded"} />
@@ -440,12 +458,22 @@ export default function NewVisitPage() {
             </div>
 
             {error && <p className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
+            {queuedOfflineMessage && (
+              <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
+                {queuedOfflineMessage}
+              </p>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
-              <Button variant="outline" className="h-12 rounded-2xl" onClick={() => setStep(1)} disabled={submitting}>
+              <Button type="button" variant="outline" className="h-12 rounded-2xl" onClick={() => setStep(1)} disabled={submitting}>
                 Back
               </Button>
-              <Button className="h-12 rounded-2xl" onClick={handleSubmit} disabled={submitting}>
+              <Button
+                type="button"
+                className="h-12 rounded-2xl"
+                onClick={handleSubmit}
+                disabled={submitting || Boolean(queuedOfflineMessage)}
+              >
                 {submitting ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -516,22 +544,14 @@ function OutletMatchPanel({
           <div className="min-w-0 flex-1">
             <p className="font-semibold text-amber-950">Offline outlet capture</p>
             <p className="mt-1 text-sm text-amber-800">
-              Nearby matching will run when this visit syncs. The outlet may require supervisor verification.
+              Save the typed shop name and GPS now. The server will match it to existing outlet data when this visit syncs.
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          className={cn(
-            "w-full rounded-xl border border-dashed p-3 text-left text-sm transition-colors",
-            forceNewOutlet
-              ? "border-amber-500 bg-white text-amber-950"
-              : "border-amber-300 bg-white/70 text-amber-900 hover:border-amber-500 hover:bg-white",
-          )}
-          onClick={onCreateNew}
-        >
-          Save <span className="font-semibold">{shopName}</span> as an offline pending outlet.
-        </button>
+        <div className="rounded-xl border border-amber-300 bg-white/80 p-3 text-sm text-amber-900">
+          <span className="font-semibold">{shopName}</span> will be queued as an unresolved outlet claim. If no confident
+          nearby match exists during sync, it will become a supervisor-reviewed new outlet.
+        </div>
       </div>
     );
   }

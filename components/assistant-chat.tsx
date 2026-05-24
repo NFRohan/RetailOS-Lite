@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState, useTransition } from "react";
+import { FormEvent, useEffect, useState, useTransition, type KeyboardEvent } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,11 +19,28 @@ const EXAMPLE_PROMPTS = [
   "Show visits that need supervisor review and why.",
   "Which outlets have fraud signals?",
 ];
+const CHAT_STORAGE_KEY = "retailos:assistant-chat:v1";
 
 export function AssistantChat() {
   const [question, setQuestion] = useState(EXAMPLE_PROMPTS[0]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [loadedSavedChat, setLoadedSavedChat] = useState(false);
   const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(CHAT_STORAGE_KEY);
+      if (saved) setMessages(JSON.parse(saved) as ChatMessage[]);
+    } catch {
+      window.localStorage.removeItem(CHAT_STORAGE_KEY);
+    }
+    setLoadedSavedChat(true);
+  }, []);
+
+  useEffect(() => {
+    if (!loadedSavedChat) return;
+    window.localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages.slice(-20)));
+  }, [loadedSavedChat, messages]);
 
   function askAssistant(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
@@ -31,6 +48,7 @@ export function AssistantChat() {
     if (!trimmed || isPending) return;
 
     setMessages((current) => [...current, { role: "user", content: trimmed }]);
+    setQuestion("");
     startTransition(async () => {
       const response = await fetch("/api/assistant/query", {
         method: "POST",
@@ -85,6 +103,17 @@ export function AssistantChat() {
                 <Search className="h-3.5 w-3.5" />
                 Pinecone RAG
               </Badge>
+              {messages.length > 0 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full"
+                  onClick={() => setMessages([])}
+                >
+                  Clear chat
+                </Button>
+              )}
             </div>
           </div>
         </CardHeader>
@@ -137,6 +166,12 @@ export function AssistantChat() {
               <Textarea
                 value={question}
                 onChange={(event) => setQuestion(event.target.value)}
+                onKeyDown={(event: KeyboardEvent<HTMLTextAreaElement>) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    askAssistant();
+                  }
+                }}
                 placeholder="Ask about failing outlets, POSM gaps, fraud signals..."
                 className="min-h-20 flex-1 resize-none border-[#c1c7cc] bg-white focus-visible:ring-teal/30"
               />
@@ -163,7 +198,7 @@ export function AssistantChat() {
             <p className="mt-1">Visit report text is embedded with OpenAI and searched in Pinecone for similar cases.</p>
           </div>
           <div className="rounded-xl bg-amber-50 p-4 text-amber-900">
-            <p className="font-semibold">Demo-safe behavior</p>
+            <p className="font-semibold">Resilient fallback</p>
             <p className="mt-1">If the AI service is offline, the API returns a deterministic database fallback answer.</p>
           </div>
         </CardContent>

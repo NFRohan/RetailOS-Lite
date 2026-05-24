@@ -17,10 +17,12 @@ export function OlympicCompetitorChart({ olympic, competitor }: Props) {
           <div key={row.name} className="grid grid-cols-[76px_minmax(0,1fr)] items-center gap-2">
             <span className="text-right text-xs font-medium text-navy">{row.name}</span>
             <div className="h-6 rounded-r-md bg-[#eef2fb]">
-              <div
-                className={`h-full min-w-1 rounded-r-md ${row.fill}`}
-                style={{ width: `${Math.max(4, (row.count / maxCount) * 100)}%` }}
-              />
+              {row.count > 0 && (
+                <div
+                  className={`h-full rounded-r-md ${row.fill}`}
+                  style={{ width: `${(row.count / maxCount) * 100}%` }}
+                />
+              )}
             </div>
           </div>
         ))}

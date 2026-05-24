@@ -176,6 +176,7 @@ export class PrismaVisitRepository implements VisitRepository {
         createdAt: new Date(report.createdAt),
       },
       update: {
+        outletId: report.outletId,
         title: report.title,
         summary: report.summary,
         retrievalText: report.retrievalText,
