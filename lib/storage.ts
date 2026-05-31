@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
 type StorageDriver = "local" | "s3";
 
@@ -37,12 +37,12 @@ export async function saveVisitImageFile({ file, visitId }: SaveVisitImageInput)
   return saveToLocalDisk({ buffer, contentType, storageKey });
 }
 
-function getStorageDriver(): StorageDriver {
+export function getStorageDriver(): StorageDriver {
   const raw = (process.env.IMAGE_STORAGE_DRIVER || "local").trim().toLowerCase();
   return raw === "s3" ? "s3" : "local";
 }
 
-function buildStorageKey(visitId: string, originalName: string): string {
+export function buildStorageKey(visitId: string, originalName: string): string {
   const prefix = trimSlashes(process.env.S3_PREFIX || "uploads");
   const safeVisitId = visitId.replace(/[^a-zA-Z0-9_-]/g, "");
   const extension = normalizedExtension(originalName);
@@ -92,16 +92,8 @@ async function saveToS3({
   contentType: string;
   storageKey: string;
 }): Promise<StoredVisitImage> {
-  const bucket = requiredEnv("S3_BUCKET");
-  const client = new S3Client({
-    region: process.env.S3_REGION || "us-east-1",
-    endpoint: process.env.S3_ENDPOINT || undefined,
-    forcePathStyle: parseBoolean(process.env.S3_FORCE_PATH_STYLE, true),
-    credentials: {
-      accessKeyId: requiredEnv("S3_ACCESS_KEY_ID"),
-      secretAccessKey: requiredEnv("S3_SECRET_ACCESS_KEY"),
-    },
-  });
+  const bucket = getS3Bucket();
+  const client = createS3Client();
 
   await client.send(
     new PutObjectCommand({
@@ -128,7 +120,7 @@ async function saveToS3({
   };
 }
 
-function publicObjectUrl(bucket: string, storageKey: string): string {
+export function publicObjectUrl(bucket: string, storageKey: string): string {
   const publicBase = process.env.IMAGE_STORAGE_PUBLIC_BASE_URL?.trim();
   if (publicBase) {
     return `${trimTrailingSlash(publicBase)}/${toUrlPath(storageKey)}`;
@@ -139,6 +131,22 @@ function publicObjectUrl(bucket: string, storageKey: string): string {
     throw new Error("IMAGE_STORAGE_PUBLIC_BASE_URL or S3_ENDPOINT is required when IMAGE_STORAGE_DRIVER=s3.");
   }
   return `${trimTrailingSlash(endpoint)}/${bucket}/${toUrlPath(storageKey)}`;
+}
+
+export function createS3Client(endpoint = process.env.S3_ENDPOINT || undefined): S3Client {
+  return new S3Client({
+    region: process.env.S3_REGION || "us-east-1",
+    endpoint,
+    forcePathStyle: parseBoolean(process.env.S3_FORCE_PATH_STYLE, true),
+    credentials: {
+      accessKeyId: requiredEnv("S3_ACCESS_KEY_ID"),
+      secretAccessKey: requiredEnv("S3_SECRET_ACCESS_KEY"),
+    },
+  });
+}
+
+export function getS3Bucket(): string {
+  return requiredEnv("S3_BUCKET");
 }
 
 function requiredEnv(name: string): string {

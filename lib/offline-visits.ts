@@ -204,14 +204,7 @@ export async function submitVisitOnline(input: OnlineVisitSubmissionInput): Prom
   }
 
   if (!uploadedHashes.has(photo.hash)) {
-    const form = new FormData();
-    form.append("file", fileForUpload(photo));
-    form.append("imageHash", photo.hash);
-
-    const imageResponse = await fetch(`/api/visits/${visit.id}/images`, { method: "POST", body: form });
-    if (!imageResponse.ok) {
-      throw await httpErrorFromResponse(imageResponse, "Failed to upload image");
-    }
+    await uploadVisitImage(visit.id, photo);
   }
 
   const submitResponse = await fetch(`/api/visits/${visit.id}/submit`, { method: "POST" });
@@ -295,6 +288,73 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
 async function httpErrorFromResponse(response: Response, fallback: string): Promise<VisitSyncHttpError> {
   const body = await response.json().catch(() => null);
   return new VisitSyncHttpError(body?.error ?? fallback, response.status);
+}
+
+async function uploadVisitImage(
+  visitId: string,
+  photo: Pick<OfflineVisitPhoto, "file" | "hash" | "name" | "type" | "lastModified">,
+): Promise<void> {
+  const file = fileForUpload(photo);
+  const presignResponse = await fetch(`/api/visits/${visitId}/images/presign`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      fileName: photo.name || file.name,
+      contentType: photo.type || file.type || "image/jpeg",
+      sizeBytes: file.size,
+      imageHash: photo.hash,
+    }),
+  });
+
+  if (presignResponse.status === 501) {
+    await uploadVisitImageViaMultipart(visitId, photo);
+    return;
+  }
+  if (!presignResponse.ok) {
+    throw await httpErrorFromResponse(presignResponse, "Failed to prepare image upload");
+  }
+
+  const signed = (await presignResponse.json()) as {
+    uploadUrl: string;
+    headers?: Record<string, string>;
+    storageKey: string;
+  };
+  const uploadResponse = await fetch(signed.uploadUrl, {
+    method: "PUT",
+    headers: signed.headers ?? { "Content-Type": photo.type || file.type || "image/jpeg" },
+    body: file,
+  });
+  if (!uploadResponse.ok) {
+    throw new VisitSyncHttpError("Failed to upload image to object storage", uploadResponse.status);
+  }
+
+  const completeResponse = await fetch(`/api/visits/${visitId}/images/complete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      storageKey: signed.storageKey,
+      imageHash: photo.hash,
+      contentType: photo.type || file.type || "image/jpeg",
+      sizeBytes: file.size,
+    }),
+  });
+  if (!completeResponse.ok) {
+    throw await httpErrorFromResponse(completeResponse, "Failed to complete image upload");
+  }
+}
+
+async function uploadVisitImageViaMultipart(
+  visitId: string,
+  photo: Pick<OfflineVisitPhoto, "file" | "hash" | "name" | "type" | "lastModified">,
+): Promise<void> {
+  const form = new FormData();
+  form.append("file", fileForUpload(photo));
+  form.append("imageHash", photo.hash);
+
+  const imageResponse = await fetch(`/api/visits/${visitId}/images`, { method: "POST", body: form });
+  if (!imageResponse.ok) {
+    throw await httpErrorFromResponse(imageResponse, "Failed to upload image");
+  }
 }
 
 function fileForUpload(photo: Pick<OfflineVisitPhoto, "file" | "name" | "type" | "lastModified">): File {

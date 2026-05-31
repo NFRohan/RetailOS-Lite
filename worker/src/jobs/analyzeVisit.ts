@@ -77,7 +77,7 @@ export async function analyzeVisit(
       {
         visitId: visit.id,
         imagePath: primaryImage.localPath,
-        imageUrl: primaryImage.url,
+        imageUrl: serverUrlForImage(primaryImage) ?? primaryImage.url,
         saveOverlay: true,
         useLlm: jobData.useLlm ?? config.defaultLlmEnabled,
         outletName: visit.outlet.name,
@@ -225,6 +225,11 @@ function selectPrimaryImage(visit: Visit) {
     throw new Error(`Primary image has neither localPath nor url for visit ${visit.id}`);
   }
   return image;
+}
+
+function serverUrlForImage(image: { metadata?: Record<string, unknown> }): string | undefined {
+  const value = image.metadata?.serverUrl;
+  return typeof value === "string" && value ? value : undefined;
 }
 
 function toAIResult(visit: Visit, analysis: AnalyzeShelfResponse): AIResultRecord {

@@ -176,11 +176,22 @@ async function imageBufferFor(image: VisitImage): Promise<Buffer | null> {
     return readLocalImageBuffer(image.localPath);
   }
 
+  const serverUrl = serverUrlFromMetadata(image.metadata);
+  if (serverUrl) {
+    return downloadImageBuffer(serverUrl);
+  }
+
   if (image.url?.startsWith("http://") || image.url?.startsWith("https://")) {
     return downloadImageBuffer(image.url);
   }
 
   return null;
+}
+
+function serverUrlFromMetadata(metadata: Record<string, unknown> | undefined): string | null {
+  if (!isRecord(metadata)) return null;
+  const value = metadata.serverUrl;
+  return typeof value === "string" && value.startsWith("http") ? value : null;
 }
 
 async function readLocalImageBuffer(localPath: string): Promise<Buffer> {
