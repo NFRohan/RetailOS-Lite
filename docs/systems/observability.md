@@ -124,6 +124,7 @@ Tracked categories:
 - Pinecone latency
 - assistant latency
 - fraud signal counts
+- protected endpoint rate-limit events
 
 ## Logs
 

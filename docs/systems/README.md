@@ -3,6 +3,7 @@
 This directory is the subsystem-level handoff pack for RetailOS Lite. It is intended for senior engineers reviewing architecture, boundaries, operational behavior, and demo readiness.
 
 For the live assessment script, use the [Showcase Demo Runbook](../SHOWCASE_DEMO_RUNBOOK.md).
+For post-demo hardening scope, use the [Production Hardening Sprint](../PRODUCTION_HARDENING_SPRINT.md).
 
 ## Reading Order
 

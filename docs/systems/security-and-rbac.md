@@ -21,7 +21,7 @@ flowchart LR
   API -->|x-api-key| AI
 ```
 
-Auth is implemented with Auth.js/NextAuth.
+Auth is implemented with Auth.js/NextAuth. Credentials auth remains enabled for local demos, and optional Google OAuth can be enabled for pilot deployments.
 
 Seeded demo users:
 
@@ -29,6 +29,22 @@ Seeded demo users:
 rep@demo.com / demo123
 supervisor@demo.com / demo123
 ```
+
+Optional OAuth configuration:
+
+```env
+NEXT_PUBLIC_AUTH_GOOGLE_ENABLED=true
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+AUTH_ALLOWED_EMAIL_DOMAINS=example.com
+AUTH_ALLOWED_EMAILS=supervisor@example.com
+```
+
+OAuth is intentionally account-registry-first:
+
+- OAuth users must already exist in the `User` table.
+- Existing `User.role` remains the source of truth for RBAC.
+- Domain/email allowlists can further restrict who may sign in; a match in either list is accepted.
 
 Session user includes:
 
@@ -93,6 +109,13 @@ Protected endpoints:
 - `POST /rag/index-report`
 - `POST /assistant/query`
 
+Protected AI endpoints are also rate-limited:
+
+```env
+AI_SERVICE_RATE_LIMIT_ENABLED=true
+AI_SERVICE_RATE_LIMIT_PER_MINUTE=60
+```
+
 Open endpoints:
 
 - `GET /health`
@@ -117,6 +140,24 @@ Supervisor/Admin:
 - Can use assistant.
 - Can view ops dashboard.
 
+## API Rate Limiting
+
+High-cost Next.js routes use lightweight fixed-window rate limits:
+
+| Route | Bucket |
+| --- | --- |
+| `POST /api/assistant/query` | `assistant` |
+| `POST /api/visits` | `visit-create` |
+| `POST /api/visits/:id/images` | `image-upload` |
+| `POST /api/outlets/search` | `outlet-search` |
+| `POST /api/outlets/submit` | `outlet-submit` |
+
+Disable locally only when needed:
+
+```env
+API_RATE_LIMIT_ENABLED=false
+```
+
 ## Secrets
 
 Secrets are split:
@@ -139,8 +180,8 @@ Important secrets:
 
 | Gap | Current state | Production fix |
 | --- | --- | --- |
-| Credentials auth only | Good for demo | Use managed identity provider or hardened auth flow |
-| No rate limits | Not implemented | Add route-level rate limits, especially assistant/upload |
+| Credentials auth only | Optional Google OAuth exists for registered users | Use managed company IdP/OIDC and lifecycle automation |
+| Rate-limit durability | Lightweight app/AI route limits implemented | Move to Redis/WAF-backed distributed limits |
 | AI service public if exposed without key | API key optional | Require key in all non-local deployments |
 | No object upload pre-signed URLs | Server-mediated uploads | Move browser uploads directly to object storage |
 | No per-outlet territory ACL | Role-level ACL only | Add rep territory/outlet assignments |

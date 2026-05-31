@@ -202,7 +202,8 @@ npm run rag:index-reports -- --limit=100
 Clear Pinecone namespace for demo reset:
 
 ```powershell
-docker compose -f docker-compose.demo.yml exec ai-service python -c "from ai_service.app import config; from ai_service.app.rag import pinecone_post; pinecone_post('/vectors/delete', {'namespace': config.PINECONE_NAMESPACE, 'deleteAll': True}); print('cleared', config.PINECONE_NAMESPACE)"
+npm run rag:clear-namespace
+npm run rag:clear-namespace -- --execute
 ```
 
 ## Outlet Merge Consistency
@@ -216,7 +217,7 @@ When duplicate outlets are merged:
 
 ## Known Gaps
 
-- Pinecone is external state; database deletes do not cascade automatically.
+- Pinecone is external state; database deletes do not cascade automatically, but namespace reset tooling exists.
 - No DLQ replay for failed embedding jobs.
 - No pgvector mirror inside Postgres.
 - The intent parser is pragmatic, not a full semantic query planner.

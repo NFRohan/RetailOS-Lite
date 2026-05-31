@@ -132,8 +132,17 @@ When an `analyze_visit` job fails its final attempt, the worker adds a copy to `
 Purpose:
 
 - Preserve payload for debugging.
-- Allow replay tooling later.
+- Allow replay without making the rep revisit the store.
 - Avoid making the rep revisit the store for a transient bug.
+
+Replay command:
+
+```powershell
+npm run worker:dlq:replay -- --limit=10
+npm run worker:dlq:replay -- --execute --remove --visit-id=visit_123
+```
+
+The command is dry-run by default. `--execute` requeues the original payload into `analyze_visit`; `--remove` deletes the DLQ copy after successful enqueue.
 
 ## Repository Boundary
 
@@ -179,6 +188,5 @@ Important metadata:
 
 ## Known Gaps
 
-- DLQ replay command is not implemented.
 - Queue cleanup uses bounded `removeOnComplete`/`removeOnFail`, not long-term archival.
 - Report indexing failures do not block visit completion; they surface in ops/failures.

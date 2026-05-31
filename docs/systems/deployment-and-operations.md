@@ -137,7 +137,8 @@ RESTART IDENTITY CASCADE;
 Wipe Pinecone namespace:
 
 ```powershell
-docker compose -f docker-compose.demo.yml exec ai-service python -c "from ai_service.app import config; from ai_service.app.rag import pinecone_post; pinecone_post('/vectors/delete', {'namespace': config.PINECONE_NAMESPACE, 'deleteAll': True}); print('cleared', config.PINECONE_NAMESPACE)"
+npm run rag:clear-namespace
+npm run rag:clear-namespace -- --execute
 ```
 
 Reindex reports after seeding:
@@ -165,7 +166,7 @@ docker compose -f docker-compose.demo.yml exec worker npm run rag:index-reports 
 - Add database pooling such as PgBouncer or Prisma Accelerate.
 - Switch image uploads to pre-signed URLs.
 - Publish Postgres only through private networking.
-- Add rate limits to uploads and assistant.
-- Add queue replay tooling for DLQ.
+- Move local fixed-window rate limits to Redis/WAF-backed distributed rate limits.
+- Operationalize DLQ replay runbooks and permissions.
 - Add backup/restore story for Postgres and object storage.
 - Add CI checks for build, worker types, and Python compile/tests.

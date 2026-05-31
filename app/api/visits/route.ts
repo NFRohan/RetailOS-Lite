@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { numberOrNull, OutletResolutionError, resolveOutletForVisit } from "@/lib/outlets";
 import { prisma } from "@/lib/prisma";
+import { rateLimit } from "@/lib/rate-limit";
 import { requireApiSession, ROLE_GROUPS } from "@/lib/rbac";
 import { serializeVisitDetail, serializeVisitListItem } from "@/lib/visits";
 import { NextResponse } from "next/server";
@@ -67,6 +68,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const limited = rateLimit(request, { bucket: "visit-create", limit: 60, windowMs: 60_000 });
+  if (limited) return limited;
+
   const authz = await requireApiSession(ROLE_GROUPS.rep);
   if (!authz.ok) return authz.response;
   const { session } = authz;

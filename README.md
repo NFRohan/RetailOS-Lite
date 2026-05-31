@@ -225,8 +225,9 @@ RetailOS Lite exposes both external observability and in-product operational vis
 | [Chatbot And RAG](docs/systems/chatbot-rag.md) | Assistant grounding, Pinecone retrieval, answer generation |
 | [Outlet Master Data](docs/systems/outlet-master-data.md) | Matching, aliases, duplicate prevention, merge behavior |
 | [Observability](docs/systems/observability.md) | Sentry, LGTM, EventLog, ops dashboard |
-| [Security And RBAC](docs/systems/security-and-rbac.md) | Auth, authorization, service security posture |
+| [Security And RBAC](docs/systems/security-and-rbac.md) | Auth, OAuth scaffold, authorization, service security posture |
 | [Deployment And Operations](docs/systems/deployment-and-operations.md) | Docker topology, env, seeding, production path |
+| [Production Hardening Sprint](docs/PRODUCTION_HARDENING_SPRINT.md) | Consolidated gap register, implemented hardening slice, remaining backlog |
 
 ## Production Path
 
@@ -240,7 +241,7 @@ The demo stack is local-first, but the boundaries map cleanly to cloud infrastru
 - Secrets Manager or platform secrets for OpenAI, Pinecone, Twilio, Sentry, and auth secrets
 - Managed Grafana or hosted Sentry for production observability
 
-Known hardening items before production: signed direct uploads, stricter API rate limits, stronger AI-service authentication, queue replay tooling, database connection pooling, and full object-storage migration away from local demo uploads.
+Known hardening items before production: signed direct uploads, Redis/WAF-backed distributed rate limits, mandatory AI-service authentication outside local, database connection pooling, and full object-storage migration away from local demo uploads.
 
 ## Project Status
 

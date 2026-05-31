@@ -1,4 +1,5 @@
 import hmac
+import time
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -53,6 +54,8 @@ PROTECTED_AI_PATHS = {
     "/assistant/query",
 }
 
+_rate_limit_buckets: dict[str, tuple[int, float]] = {}
+
 
 @app.middleware("http")
 async def api_key_middleware(request: Request, call_next):
@@ -61,6 +64,25 @@ async def api_key_middleware(request: Request, call_next):
         if not hmac.compare_digest(provided_key, config.AI_SERVICE_API_KEY):
             log_event("ai_service_auth_failed", path=request.url.path, method=request.method)
             return JSONResponse({"detail": "Unauthorized"}, status_code=401)
+    return await call_next(request)
+
+
+@app.middleware("http")
+async def protected_endpoint_rate_limit_middleware(request: Request, call_next):
+    if should_rate_limit(request):
+        allowed, retry_after = consume_rate_limit(request)
+        if not allowed:
+            log_event(
+                "ai_service_rate_limited",
+                path=request.url.path,
+                method=request.method,
+                retryAfterSeconds=retry_after,
+            )
+            return JSONResponse(
+                {"detail": "Too many requests. Please retry shortly.", "retryAfterSeconds": retry_after},
+                status_code=429,
+                headers={"Retry-After": str(retry_after)},
+            )
     return await call_next(request)
 
 config.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -74,6 +96,41 @@ def should_require_api_key(request: Request) -> bool:
         and request.method != "OPTIONS"
         and request.url.path in PROTECTED_AI_PATHS
     )
+
+
+def should_rate_limit(request: Request) -> bool:
+    return (
+        config.AI_SERVICE_RATE_LIMIT_ENABLED
+        and request.method != "OPTIONS"
+        and request.url.path in PROTECTED_AI_PATHS
+        and config.AI_SERVICE_RATE_LIMIT_PER_MINUTE > 0
+    )
+
+
+def consume_rate_limit(request: Request) -> tuple[bool, int]:
+    now = time.time()
+    window_seconds = 60
+    identity = request.headers.get("x-forwarded-for", "").split(",")[0].strip() or (
+        request.client.host if request.client else "local"
+    )
+    key = f"{request.url.path}:{identity}"
+    count, reset_at = _rate_limit_buckets.get(key, (0, now + window_seconds))
+    if reset_at <= now:
+        count = 0
+        reset_at = now + window_seconds
+    count += 1
+    _rate_limit_buckets[key] = (count, reset_at)
+    prune_rate_limit_buckets(now)
+    retry_after = max(1, int(reset_at - now))
+    return count <= config.AI_SERVICE_RATE_LIMIT_PER_MINUTE, retry_after
+
+
+def prune_rate_limit_buckets(now: float) -> None:
+    if len(_rate_limit_buckets) < 1000:
+        return
+    expired = [key for key, (_, reset_at) in _rate_limit_buckets.items() if reset_at <= now]
+    for key in expired:
+        _rate_limit_buckets.pop(key, None)
 
 
 @app.get("/health", response_model=HealthResponse)

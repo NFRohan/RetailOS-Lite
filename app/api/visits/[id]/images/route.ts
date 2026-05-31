@@ -4,6 +4,7 @@ import { correlationIdFromHeaders } from "@/lib/observability/correlation";
 import { logError, logInfo } from "@/lib/observability/logger";
 import { metrics } from "@/lib/observability/metrics";
 import { prisma } from "@/lib/prisma";
+import { rateLimit } from "@/lib/rate-limit";
 import { requireApiSession, ROLE_GROUPS } from "@/lib/rbac";
 import { saveVisitImageFile } from "@/lib/storage";
 import { NextResponse } from "next/server";
@@ -11,6 +12,9 @@ import { NextResponse } from "next/server";
 type Params = { params: Promise<{ id: string }> };
 
 export async function POST(request: NextRequest, { params }: Params) {
+  const limited = rateLimit(request, { bucket: "image-upload", limit: 30, windowMs: 60_000 });
+  if (limited) return limited;
+
   const correlationId = correlationIdFromHeaders(request.headers, "upload");
   const started = Date.now();
   const authz = await requireApiSession(ROLE_GROUPS.rep);

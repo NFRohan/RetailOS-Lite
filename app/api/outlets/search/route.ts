@@ -1,9 +1,13 @@
 import type { NextRequest } from "next/server";
 import { OutletResolutionError, searchOutletCandidates } from "@/lib/outlets";
+import { rateLimit } from "@/lib/rate-limit";
 import { requireApiSession } from "@/lib/rbac";
 import { NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
+  const limited = rateLimit(request, { bucket: "outlet-search", limit: 120, windowMs: 60_000 });
+  if (limited) return limited;
+
   const authz = await requireApiSession();
   if (!authz.ok) return authz.response;
 

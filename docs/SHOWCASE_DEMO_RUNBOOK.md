@@ -210,7 +210,7 @@ Mention:
 
 If asked about rate limits/backpressure:
 
-> AI service load is controlled today by BullMQ and worker concurrency. The next hardening step is HTTP rate limits and queue-depth admission control.
+> AI service load is controlled by BullMQ, bounded worker concurrency, lightweight HTTP rate limits, and protected FastAPI endpoints. The next hardening step is Redis/WAF-backed distributed rate limiting and queue-depth admission control.
 
 ## Segment 6: Outlet Governance
 
@@ -397,7 +397,7 @@ Worker-side exact duplicate, perceptual duplicate, GPS mismatch, timestamp anoma
 
 ### What is production-ready vs demo-ready?
 
-Production-shaped: async queues, storage abstraction, API key auth, RBAC, observability, DLQ, RAG grounding. Next hardening: rate limits, signed uploads, DB pooling, DLQ replay, cloud deployment.
+Production-shaped: async queues, storage abstraction, API key auth, optional OAuth scaffold, RBAC, observability, DLQ replay, RAG grounding, and lightweight rate limits. Next hardening: signed uploads, DB pooling, distributed rate limits, and cloud deployment.
 
 ## Do Not Say
 

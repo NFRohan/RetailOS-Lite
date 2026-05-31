@@ -25,6 +25,7 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const googleEnabled = process.env.NEXT_PUBLIC_AUTH_GOOGLE_ENABLED === "true";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -103,6 +104,21 @@ function LoginPage() {
                 {loading ? "Signing in…" : "Sign in"}
               </Button>
             </form>
+            {googleEnabled && (
+              <div className="mt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => signIn("google", { callbackUrl: callbackUrl ?? "/" })}
+                >
+                  Continue with Google
+                </Button>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  OAuth users must already exist in RetailOS and pass the configured domain/email allowlist.
+                </p>
+              </div>
+            )}
             <div className="mt-6 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
               <p className="font-medium text-foreground">Demo accounts</p>
               <p>Rep: rep@demo.com / demo123</p>

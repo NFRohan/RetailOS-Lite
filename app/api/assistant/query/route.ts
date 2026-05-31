@@ -10,10 +10,14 @@ import { correlationIdFromHeaders } from "@/lib/observability/correlation";
 import { logError, logInfo, logWarn } from "@/lib/observability/logger";
 import { metrics } from "@/lib/observability/metrics";
 import { prisma } from "@/lib/prisma";
+import { rateLimit } from "@/lib/rate-limit";
 import { requireApiSession, ROLE_GROUPS } from "@/lib/rbac";
 import { NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
+  const limited = rateLimit(request, { bucket: "assistant", limit: 20, windowMs: 60_000 });
+  if (limited) return limited;
+
   const correlationId = correlationIdFromHeaders(request.headers, "assistant");
   const started = Date.now();
   const authz = await requireApiSession(ROLE_GROUPS.supervisor);
