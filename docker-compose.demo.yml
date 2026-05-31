@@ -32,6 +32,7 @@ x-node-env: &node-env
   ANALYZE_VISIT_QUEUE: analyze_visit
   ANALYZE_VISIT_DLQ: analyze_visit_dlq
   EMBED_VISIT_REPORT_QUEUE: embed_visit_report
+  EMBED_VISIT_REPORT_DLQ: embed_visit_report_dlq
   WORKER_CONCURRENCY: 2
   WORKER_METRICS_PORT: 9101
   WORKER_USE_LLM: "true"

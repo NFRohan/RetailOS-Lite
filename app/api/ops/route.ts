@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { Queue } from "bullmq";
 import { Redis } from "ioredis";
 import { prisma } from "@/lib/prisma";
+import { queueConfig } from "@/lib/queue";
 import { requireApiSession, ROLE_GROUPS } from "@/lib/rbac";
 import { NextResponse } from "next/server";
 
@@ -66,21 +67,22 @@ async function loadQueueHealth() {
 }
 
 async function readQueueHealth() {
-  const redisUrl = process.env.REDIS_URL || "redis://127.0.0.1:6379";
-  const analyzeQueueName = process.env.ANALYZE_VISIT_QUEUE || "analyze_visit";
-  const embedQueueName = process.env.EMBED_VISIT_REPORT_QUEUE || "embed_visit_report";
-  const dlqName = process.env.ANALYZE_VISIT_DLQ || "analyze_visit_dlq";
+  const redisUrl = queueConfig.redisUrl;
+  const analyzeQueueName = queueConfig.analyzeVisitQueueName;
+  const embedQueueName = queueConfig.embedVisitReportQueueName;
+  const dlqName = queueConfig.analyzeVisitDeadLetterQueueName;
+  const embedDlqName = queueConfig.embedVisitReportDeadLetterQueueName;
 
   try {
     const connection = getRedisConnection(redisUrl);
     if (connection.status === "wait") {
       await connection.connect();
     }
-    const queues = getQueueClients(connection, [analyzeQueueName, embedQueueName, dlqName]);
-    const [analyze, embed, dlq] = await Promise.all(queues.map(readQueue));
+    const queues = getQueueClients(connection, [analyzeQueueName, embedQueueName, dlqName, embedDlqName]);
+    const [analyze, embed, dlq, embedDlq] = await Promise.all(queues.map(readQueue));
     return {
       status: "connected",
-      queues: [analyze, embed, dlq],
+      queues: [analyze, embed, dlq, embedDlq],
     };
   } catch (error) {
     return {
@@ -90,6 +92,7 @@ async function readQueueHealth() {
         emptyQueue(analyzeQueueName),
         emptyQueue(embedQueueName),
         emptyQueue(dlqName),
+        emptyQueue(embedDlqName),
       ],
     };
   }
@@ -140,7 +143,7 @@ function emptyQueue(name: string) {
 }
 
 function workerHealth(queueHealth: Awaited<ReturnType<typeof loadQueueHealth>>) {
-  const analyzeQueue = queueHealth.queues.find((queue) => queue.name === (process.env.ANALYZE_VISIT_QUEUE || "analyze_visit"));
+  const analyzeQueue = queueHealth.queues.find((queue) => queue.name === queueConfig.analyzeVisitQueueName);
   const waiting = Number(analyzeQueue?.counts.waiting ?? 0);
   const active = Number(analyzeQueue?.counts.active ?? 0);
   const failed = queueHealth.queues.reduce((total, queue) => total + Number(queue.counts.failed ?? 0), 0);

@@ -35,6 +35,7 @@ export const config = {
   analyzeVisitQueueName: env("ANALYZE_VISIT_QUEUE", "analyze_visit"),
   analyzeVisitDeadLetterQueueName: env("ANALYZE_VISIT_DLQ", "analyze_visit_dlq"),
   embedVisitReportQueueName: env("EMBED_VISIT_REPORT_QUEUE", "embed_visit_report"),
+  embedVisitReportDeadLetterQueueName: env("EMBED_VISIT_REPORT_DLQ", "embed_visit_report_dlq"),
   workerMetricsPort: envNumber("WORKER_METRICS_PORT", 9101),
   appEnv: env("APP_ENV", process.env.NODE_ENV || "development"),
   sentryDsn: optionalEnv("SENTRY_DSN"),

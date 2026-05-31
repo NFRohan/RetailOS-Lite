@@ -22,7 +22,9 @@ function env(name: string, fallback: string): string {
 export const queueConfig = {
   redisUrl: env("REDIS_URL", "redis://127.0.0.1:6379"),
   analyzeVisitQueueName: env("ANALYZE_VISIT_QUEUE", "analyze_visit"),
+  analyzeVisitDeadLetterQueueName: env("ANALYZE_VISIT_DLQ", "analyze_visit_dlq"),
   embedVisitReportQueueName: env("EMBED_VISIT_REPORT_QUEUE", "embed_visit_report"),
+  embedVisitReportDeadLetterQueueName: env("EMBED_VISIT_REPORT_DLQ", "embed_visit_report_dlq"),
 };
 
 let redisConnection: Redis | null = null;

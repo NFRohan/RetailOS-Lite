@@ -11,6 +11,7 @@ The worker decouples rep submission from expensive AI and fraud processing. Requ
 | `analyze_visit` | `analyze_visit` | Full visit analysis lifecycle |
 | `embed_visit_report` | `embed_visit_report` | Embed and upsert visit report to Pinecone |
 | `analyze_visit_dlq` | `analyze_visit_failed` | Dead-letter copy after terminal analyze failure |
+| `embed_visit_report_dlq` | `embed_visit_report_failed` | Dead-letter copy after terminal embedding failure |
 
 Queue names are env-configurable:
 
@@ -18,6 +19,7 @@ Queue names are env-configurable:
 ANALYZE_VISIT_QUEUE=analyze_visit
 EMBED_VISIT_REPORT_QUEUE=embed_visit_report
 ANALYZE_VISIT_DLQ=analyze_visit_dlq
+EMBED_VISIT_REPORT_DLQ=embed_visit_report_dlq
 ```
 
 ## Enqueue Points
@@ -114,13 +116,14 @@ embed_visit_report
   -> AI service POST /rag/index-report
   -> Pinecone upsert vector id visit-report:{visitId}
   -> EventLog VISIT_REPORT_INDEXED
+  -> optional embed_visit_report_dlq after terminal failure
 ```
 
 This same queue is used after outlet merge so stale Pinecone metadata is overwritten.
 
 ## Dead-Letter Queue
 
-When an `analyze_visit` job fails its final attempt, the worker adds a copy to `analyze_visit_dlq` with:
+When an `analyze_visit` or `embed_visit_report` job fails its final attempt, the worker adds a copy to the matching DLQ with:
 
 - original job id/name
 - attempts made
@@ -140,9 +143,11 @@ Replay command:
 ```powershell
 npm run worker:dlq:replay -- --limit=10
 npm run worker:dlq:replay -- --execute --remove --visit-id=visit_123
+npm run worker:dlq:replay -- --queue=embedding --limit=10
+npm run worker:dlq:replay -- --queue=embedding --execute --remove --visit-id=visit_123
 ```
 
-The command is dry-run by default. `--execute` requeues the original payload into `analyze_visit`; `--remove` deletes the DLQ copy after successful enqueue.
+The command is dry-run by default. `--queue=analyze` requeues into `analyze_visit`; `--queue=embedding` requeues into `embed_visit_report`; `--remove` deletes the DLQ copy after successful enqueue.
 
 ## Repository Boundary
 
@@ -188,5 +193,5 @@ Important metadata:
 
 ## Known Gaps
 
-- Queue cleanup uses bounded `removeOnComplete`/`removeOnFail`, not long-term archival.
-- Report indexing failures do not block visit completion; they surface in ops/failures.
+- Queue cleanup uses bounded `removeOnComplete`/`removeOnFail` plus manual archive tooling, not automated retention policies.
+- Report indexing failures do not block visit completion; they surface in ops/failures and can be replayed from `embed_visit_report_dlq`.

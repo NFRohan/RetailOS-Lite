@@ -17,6 +17,7 @@ analyze_visit job
   -> enqueue and process embed_visit_report for Pinecone indexing
   -> mark visit COMPLETE or FLAGGED
   -> copy terminal failures to analyze_visit_dlq
+  -> copy terminal embedding failures to embed_visit_report_dlq
   -> write EventLog entries
 ```
 
@@ -82,6 +83,7 @@ REDIS_URL=redis://127.0.0.1:6379
 ANALYZE_VISIT_QUEUE=analyze_visit
 ANALYZE_VISIT_DLQ=analyze_visit_dlq
 EMBED_VISIT_REPORT_QUEUE=embed_visit_report
+EMBED_VISIT_REPORT_DLQ=embed_visit_report_dlq
 WORKER_USE_LLM=true
 WORKER_METRICS_PORT=9101
 LOG_TO_FILE=false
@@ -90,7 +92,7 @@ SENTRY_DSN=
 
 `RETAILOS_AI_SERVICE_API_KEY` is optional for local dev. When set on the FastAPI service, the worker sends it as `x-api-key` for `/analyze-shelf`.
 
-Terminal failed `analyze_visit` jobs are copied into `ANALYZE_VISIT_DLQ` with the original payload, attempts, failure reason, and stacktrace so the job can be inspected and replayed.
+Terminal failed `analyze_visit` and `embed_visit_report` jobs are copied into their DLQs with the original payload, attempts, failure reason, and stacktrace so the job can be inspected and replayed.
 
 ## RAG Indexing
 
@@ -104,6 +106,13 @@ npm run rag:index-reports -- --limit=100
 ```
 
 The backfill uses Postgres when `DATABASE_URL` is present and falls back to `worker/data/db.json` for local demos.
+
+Replay failed indexing jobs:
+
+```powershell
+npm run worker:dlq:replay -- --queue=embedding --limit=10
+npm run worker:dlq:replay -- --queue=embedding --execute --remove --visit-id=visit_123
+```
 
 ## Observability
 

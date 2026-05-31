@@ -76,6 +76,7 @@ async function archiveQueues(outputPath: string): Promise<{ count: number; error
     process.env.ANALYZE_VISIT_QUEUE || "analyze_visit",
     process.env.EMBED_VISIT_REPORT_QUEUE || "embed_visit_report",
     process.env.ANALYZE_VISIT_DLQ || "analyze_visit_dlq",
+    process.env.EMBED_VISIT_REPORT_DLQ || "embed_visit_report_dlq",
   ];
   let count = 0;
   const records: unknown[] = [];
