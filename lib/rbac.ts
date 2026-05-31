@@ -7,6 +7,7 @@ export const ROLE_GROUPS = {
   authenticated: ["REP", "SUPERVISOR", "ADMIN"],
   rep: ["REP"],
   supervisor: ["SUPERVISOR", "ADMIN"],
+  admin: ["ADMIN"],
 } as const satisfies Record<string, readonly Role[]>;
 
 export type AuthorizedSession = Session & {

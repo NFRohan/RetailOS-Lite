@@ -28,6 +28,7 @@ Seeded demo users:
 ```text
 rep@demo.com / demo123
 supervisor@demo.com / demo123
+admin@demo.com / demo123
 ```
 
 Optional OAuth configuration:
@@ -59,7 +60,7 @@ Session user includes:
 | --- | --- |
 | `REP` | Create and view own visits |
 | `SUPERVISOR` | View all operational data and use assistant |
-| `ADMIN` | Supervisor-equivalent in current demo |
+| `ADMIN` | Supervisor permissions plus operational replay controls |
 
 Role groups in `lib/rbac.ts`:
 
@@ -67,6 +68,7 @@ Role groups in `lib/rbac.ts`:
 authenticated: ["REP", "SUPERVISOR", "ADMIN"]
 rep: ["REP"]
 supervisor: ["SUPERVISOR", "ADMIN"]
+admin: ["ADMIN"]
 ```
 
 ## Server-Side Enforcement
@@ -84,6 +86,7 @@ Examples:
 | `GET /api/dashboard` | `SUPERVISOR`, `ADMIN` |
 | `POST /api/assistant/query` | `SUPERVISOR`, `ADMIN` |
 | Outlet approval/merge/reject | `SUPERVISOR`, `ADMIN` |
+| `POST /api/ops/dlq/replay` | `ADMIN` |
 
 Client-side hiding is not treated as authorization.
 
@@ -140,6 +143,10 @@ Supervisor/Admin:
 - Can use assistant.
 - Can view ops dashboard.
 
+Admin only:
+
+- Can dry-run or execute DLQ replay through `POST /api/ops/dlq/replay`.
+
 ## API Rate Limiting
 
 High-cost Next.js routes use Redis-backed fixed-window rate limits:
@@ -189,7 +196,7 @@ Important secrets:
 | AI service public if exposed without key | Key required outside local/development/test | Keep service private and rotate keys through secret manager |
 | Object upload exposure | Browser uses pre-signed MinIO/S3 uploads | Add antivirus/content moderation if needed |
 | No per-outlet territory ACL | Role-level ACL only | Add rep territory/outlet assignments |
-| No audit actor on every EventLog | Some events include actor metadata | Standardize actor fields |
+| No audit actor on every EventLog | API/worker operational events include actor metadata where applicable | Add immutable audit export if required |
 
 ## Operational Guidance
 

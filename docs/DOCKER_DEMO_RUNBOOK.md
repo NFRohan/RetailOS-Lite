@@ -47,6 +47,7 @@ RetailOS demo users:
 
 - Rep: `rep@demo.com` / `demo123`
 - Supervisor: `supervisor@demo.com` / `demo123`
+- Admin: `admin@demo.com` / `demo123`
 
 ## Why This Avoids Port Hiccups
 

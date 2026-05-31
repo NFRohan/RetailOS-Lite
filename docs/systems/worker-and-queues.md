@@ -149,6 +149,25 @@ npm run worker:dlq:replay -- --queue=embedding --execute --remove --visit-id=vis
 
 The command is dry-run by default. `--queue=analyze` requeues into `analyze_visit`; `--queue=embedding` requeues into `embed_visit_report`; `--remove` deletes the DLQ copy after successful enqueue.
 
+Admin API:
+
+```http
+POST /api/ops/dlq/replay
+```
+
+Request:
+
+```json
+{
+  "queue": "embedding",
+  "visitId": "visit_123",
+  "execute": false,
+  "remove": false
+}
+```
+
+The endpoint requires `ADMIN`. Without `execute: true`, it records a dry-run event and returns the matching DLQ payloads without requeueing.
+
 ## Repository Boundary
 
 Worker repository interface:
