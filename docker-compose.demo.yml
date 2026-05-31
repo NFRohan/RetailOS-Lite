@@ -7,6 +7,7 @@ x-node-env: &node-env
   LOG_TO_FILE: "true"
   LOG_DIR: logs
   DATABASE_URL: postgresql://retailos:retailos@postgres:5432/retailos
+  DATABASE_DIRECT_URL: postgresql://retailos:retailos@postgres:5432/retailos
   REDIS_URL: redis://redis:6379
   RATE_LIMIT_REDIS_URL: redis://redis:6379
   AI_SERVICE_URL: http://ai-service:8001

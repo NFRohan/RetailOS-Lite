@@ -28,7 +28,7 @@ Turn the internship-winning demo into a safer pilot-ready system without changin
 | Priority | Item | Notes |
 | --- | --- | --- |
 | P0 | Direct-to-bucket upload URLs | Remove app-server upload pressure and serverless filesystem risk |
-| P0 | Managed DB pooling | PgBouncer/Prisma Accelerate before serverless production load |
+| P0 | Managed DB pooling | Prisma now supports split pooled/direct URLs; deploy `DATABASE_URL` through PgBouncer/Accelerate and keep `DATABASE_DIRECT_URL` direct |
 | P1 | PostGIS/pg_trgm outlet matching | Move bounded app-side matching into DB-native entity resolution |
 | P1 | Long-term queue/event archival | Current queues keep bounded recent history |
 | P1 | Standardized EventLog actor metadata | Some events include actor/user context; make it uniform |

@@ -163,7 +163,7 @@ docker compose -f docker-compose.demo.yml exec worker npm run rag:index-reports 
 ## Production Hardening Checklist
 
 - Require AI service API key outside local.
-- Add database pooling such as PgBouncer or Prisma Accelerate.
+- Point `DATABASE_URL` at PgBouncer or Prisma Accelerate; keep `DATABASE_DIRECT_URL` pointed at direct Postgres for schema operations.
 - Switch image uploads to pre-signed URLs.
 - Publish Postgres only through private networking.
 - Move local fixed-window rate limits to Redis/WAF-backed distributed rate limits.
