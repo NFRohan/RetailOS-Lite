@@ -918,6 +918,6 @@ These are intentionally not hidden.
 | Gap | Current workaround |
 | --- | --- |
 | No cloud deployment yet | Local Docker infra and env-driven service URLs are ready |
-| No direct-to-bucket pre-signed upload | Server API writes to local disk or S3-compatible object storage |
-| No PgBouncer/Prisma Accelerate | Prisma singleton is used locally; serverless deploy should use pooled `DATABASE_URL` |
+| Edge/WAF rate-limit policy | Redis-backed app/AI rate limits are implemented; public deployments should add edge limits |
+| Managed pooler provisioning | Prisma supports `DATABASE_URL` for pooled runtime traffic and `DATABASE_DIRECT_URL` for schema operations |
 | Limited assistant intent parser | Exact compliance/POSM/fraud/review paths exist; broader NL questions fall back to vector retrieval |

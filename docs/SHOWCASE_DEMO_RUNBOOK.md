@@ -310,7 +310,7 @@ Say:
 
 Then acknowledge gaps:
 
-> If we had another sprint, I would add endpoint-level AI service rate limiting, direct-to-bucket signed uploads, DB pooling for serverless deployment, and DLQ replay tooling. The architecture already isolates those changes.
+> If we had another sprint, I would add edge/WAF rate-limit policy, PostGIS/pg_trgm outlet matching, image compression, and long-term queue archival. The architecture already isolates those changes.
 
 Final sentence:
 

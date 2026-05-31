@@ -9,7 +9,9 @@ Turn the internship-winning demo into a safer pilot-ready system without changin
 | Track | Deliverables | Definition of Done |
 | --- | --- | --- |
 | Auth and RBAC | Optional Google OAuth for existing users, email/domain allowlist, credentials retained for local demo | `npm run build` passes; OAuth cannot create arbitrary users |
-| Abuse Protection | In-memory rate limits on assistant, upload, visit creation, outlet search/submit, and FastAPI protected AI endpoints | 429 responses include `Retry-After`; limits are env-disableable for local debugging |
+| Abuse Protection | Redis-backed rate limits on assistant, upload, visit creation, outlet search/submit, and FastAPI protected AI endpoints | 429 responses include `Retry-After`; limits are env-disableable for local debugging |
+| Upload Hardening | Browser-to-MinIO/S3 pre-signed image uploads | S3 credentials never reach frontend; completion verifies object before DB insert |
+| Database Pooling | Split Prisma pooled runtime URL from direct schema URL | `DATABASE_URL` can point to PgBouncer/Accelerate; `DATABASE_DIRECT_URL` remains direct |
 | Queue Recovery | DLQ replay command for terminal `analyze_visit` failures | Dry-run by default; `--execute` requeues payloads; optional `--remove` cleans DLQ job |
 | Vector Store Hygiene | Pinecone namespace cleanup command | Dry-run by default; `--execute` deletes the configured namespace |
 | Documentation | Update subsystem docs and gap register | Docs describe implemented controls and remaining production work |
@@ -20,6 +22,10 @@ Turn the internship-winning demo into a safer pilot-ready system without changin
 - OAuth users must already exist in the `User` table and may be constrained by `AUTH_ALLOWED_EMAILS` or `AUTH_ALLOWED_EMAIL_DOMAINS`.
 - `lib/rate-limit.ts` adds lightweight fixed-window request throttling for high-cost Next.js API routes.
 - FastAPI now rate-limits protected inference/RAG endpoints with `AI_SERVICE_RATE_LIMIT_PER_MINUTE`.
+- Rate limits use Redis so they work across horizontally scaled app/service instances.
+- FastAPI requires `RETAILOS_AI_SERVICE_API_KEY` outside local/development/test environments.
+- S3/MinIO mode uses pre-signed PUT URLs and `/complete` verification instead of app-server image streaming.
+- Prisma supports split `DATABASE_URL` and `DATABASE_DIRECT_URL` for pooled deployments.
 - `npm run worker:dlq:replay` replays `analyze_visit_dlq` jobs.
 - `npm run rag:clear-namespace` clears the configured Pinecone namespace.
 
@@ -27,8 +33,7 @@ Turn the internship-winning demo into a safer pilot-ready system without changin
 
 | Priority | Item | Notes |
 | --- | --- | --- |
-| P0 | Direct-to-bucket upload URLs | Remove app-server upload pressure and serverless filesystem risk |
-| P0 | Managed DB pooling | Prisma now supports split pooled/direct URLs; deploy `DATABASE_URL` through PgBouncer/Accelerate and keep `DATABASE_DIRECT_URL` direct |
+| P0 | Edge/WAF policy | App and AI limits are Redis-backed; public deployments should still add edge/WAF limits |
 | P1 | PostGIS/pg_trgm outlet matching | Move bounded app-side matching into DB-native entity resolution |
 | P1 | Long-term queue/event archival | Current queues keep bounded recent history |
 | P1 | Standardized EventLog actor metadata | Some events include actor/user context; make it uniform |

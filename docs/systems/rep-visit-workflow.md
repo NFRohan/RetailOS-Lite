@@ -171,5 +171,5 @@ Retry policy:
 ## Known Gaps
 
 - The flow does not support multi-image visits.
-- The upload path still streams through the app server; production should prefer direct-to-bucket signed uploads.
+- S3/MinIO mode uses direct-to-bucket signed uploads; local multipart upload remains as a dev fallback.
 - Offline conflict resolution is intentionally simple: client idempotency, one image, retryable error classification, and server-side outlet resolution on sync.

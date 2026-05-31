@@ -142,13 +142,15 @@ Supervisor/Admin:
 
 ## API Rate Limiting
 
-High-cost Next.js routes use lightweight fixed-window rate limits:
+High-cost Next.js routes use Redis-backed fixed-window rate limits:
 
 | Route | Bucket |
 | --- | --- |
 | `POST /api/assistant/query` | `assistant` |
 | `POST /api/visits` | `visit-create` |
 | `POST /api/visits/:id/images` | `image-upload` |
+| `POST /api/visits/:id/images/presign` | `image-presign` |
+| `POST /api/visits/:id/images/complete` | `image-complete` |
 | `POST /api/outlets/search` | `outlet-search` |
 | `POST /api/outlets/submit` | `outlet-submit` |
 
@@ -156,6 +158,8 @@ Disable locally only when needed:
 
 ```env
 API_RATE_LIMIT_ENABLED=false
+RATE_LIMIT_REDIS_URL=redis://127.0.0.1:6379
+RATE_LIMIT_FAIL_OPEN=false
 ```
 
 ## Secrets
@@ -181,9 +185,9 @@ Important secrets:
 | Gap | Current state | Production fix |
 | --- | --- | --- |
 | Credentials auth only | Optional Google OAuth exists for registered users | Use managed company IdP/OIDC and lifecycle automation |
-| Rate-limit durability | Lightweight app/AI route limits implemented | Move to Redis/WAF-backed distributed limits |
-| AI service public if exposed without key | API key optional | Require key in all non-local deployments |
-| No object upload pre-signed URLs | Server-mediated uploads | Move browser uploads directly to object storage |
+| Rate-limit edge enforcement | Redis-backed app/AI route limits implemented | Add WAF/edge limits in front of public deployments |
+| AI service public if exposed without key | Key required outside local/development/test | Keep service private and rotate keys through secret manager |
+| Object upload exposure | Browser uses pre-signed MinIO/S3 uploads | Add antivirus/content moderation if needed |
 | No per-outlet territory ACL | Role-level ACL only | Add rep territory/outlet assignments |
 | No audit actor on every EventLog | Some events include actor metadata | Standardize actor fields |
 

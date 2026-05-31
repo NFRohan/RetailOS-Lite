@@ -11,16 +11,22 @@ Code: `lib/storage.ts`
 ```mermaid
 flowchart TD
   Browser[Browser upload]
-  API[POST /api/visits/:id/images]
+  Presign[POST /api/visits/:id/images/presign]
+  Complete[POST /api/visits/:id/images/complete]
+  API[Legacy POST /api/visits/:id/images]
   Driver{IMAGE_STORAGE_DRIVER}
   Local[public/uploads]
   S3[S3 compatible bucket]
   DB[(VisitImage)]
   Worker[Worker reads imagePath or imageUrl]
 
+  Browser --> Presign
+  Presign --> S3
+  Browser -->|PUT signed URL| S3
+  Browser --> Complete --> DB
   Browser --> API --> Driver
   Driver -- local --> Local --> DB
-  Driver -- s3 --> S3 --> DB
+  Driver -- s3 fallback --> S3 --> DB
   DB --> Worker
 ```
 
@@ -56,6 +62,7 @@ Env:
 ```env
 IMAGE_STORAGE_DRIVER=s3
 S3_ENDPOINT=http://127.0.0.1:19000
+S3_PRESIGN_ENDPOINT=http://127.0.0.1:19000
 S3_REGION=us-east-1
 S3_BUCKET=retailos-images
 S3_ACCESS_KEY_ID=retailos
@@ -63,15 +70,19 @@ S3_SECRET_ACCESS_KEY=retailos-secret
 S3_FORCE_PATH_STYLE=true
 S3_PREFIX=uploads
 IMAGE_STORAGE_PUBLIC_BASE_URL=http://127.0.0.1:19000/retailos-images
+IMAGE_STORAGE_INTERNAL_BASE_URL=http://127.0.0.1:19000/retailos-images
 ```
 
 Behavior:
 
-- Uploads object with AWS SDK.
+- The app signs short-lived PUT URLs server-side.
+- The browser uploads directly to MinIO/S3 using the signed URL.
+- The browser then calls `/api/visits/:id/images/complete`.
+- The completion route verifies the object with `HeadObject` before creating `VisitImage`.
 - Stores storage metadata on `VisitImage.metadata`.
-- Returns public object URL.
+- Returns public object URL without exposing S3/MinIO credentials to the frontend.
 
-Demo compose includes MinIO and bucket initialization.
+Demo compose uses MinIO, bucket initialization, public-read object URLs, and CORS for browser PUT uploads.
 
 ## Upload Constraints
 
@@ -94,7 +105,9 @@ sequenceDiagram
   Browser->>IDB: save queued visit and one photo
   Browser->>Browser: wait for online
   Browser->>API: POST /api/visits
-  Browser->>API: POST /api/visits/:id/images
+  Browser->>API: POST /api/visits/:id/images/presign
+  Browser->>API: PUT signed MinIO/S3 URL
+  Browser->>API: POST /api/visits/:id/images/complete
   Browser->>API: POST /api/visits/:id/submit
   API->>Queue: enqueue analyze_visit
   Browser->>IDB: delete synced item
@@ -133,7 +146,9 @@ Outlet resolution:
 ```text
 If online:
   POST /api/visits
-  POST /api/visits/:id/images
+  POST /api/visits/:id/images/presign
+  PUT signed object URL
+  POST /api/visits/:id/images/complete
   POST /api/visits/:id/submit
   delete offline queue item
 ```
@@ -169,7 +184,7 @@ If a visit already exists for the same rep and client id:
 
 ## Production Notes
 
-- Direct-to-bucket signed uploads would remove app-server upload load.
+- Direct-to-bucket signed uploads are implemented for S3/MinIO mode; local multipart upload remains as a dev fallback.
 - Multi-image offline sync is intentionally out of scope.
 - Image compression/thumbnail generation should be added before real deployment.
 - IndexedDB data is not secure storage; do not store secrets there.
