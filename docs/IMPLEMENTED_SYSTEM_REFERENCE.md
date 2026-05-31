@@ -15,7 +15,7 @@ Visit image
   -> optional OpenAI vision POSM analysis
   -> compliance scoring
   -> BullMQ worker persistence flow
-  -> optional DLQ capture for terminal worker failures
+  -> DLQ capture for terminal analyze and embedding failures
   -> dashboard-ready outcome summary
   -> visit report retrieval text
   -> OpenAI embedding + Pinecone vector index
@@ -32,7 +32,7 @@ Implemented modules:
 | OpenAI POSM analysis | Implemented | Optional vision LLM layer for Olympic POSM and summary |
 | Compliance scoring | Implemented | Deterministic rules with score, status, reasons, action |
 | Worker orchestration | Implemented | BullMQ `analyze_visit` job calls AI service and saves output |
-| Dead-letter queue | Implemented | Terminal failed `analyze_visit` jobs are copied to `analyze_visit_dlq` |
+| Dead-letter queue | Implemented | Terminal failed `analyze_visit` and `embed_visit_report` jobs are copied to matching DLQs |
 | Fraud checks | Implemented | Exact duplicate, perceptual duplicate, GPS mismatch, timestamp anomaly, EXIF GPS/time checks |
 | Image storage | Implemented | Local disk by default; S3-compatible MinIO/R2/S3 driver available |
 | Offline sync | Implemented | Rep visits queue in IndexedDB and sync through TanStack Query when online |
@@ -112,6 +112,7 @@ REDIS_URL=redis://127.0.0.1:6379
 ANALYZE_VISIT_QUEUE=analyze_visit
 ANALYZE_VISIT_DLQ=analyze_visit_dlq
 EMBED_VISIT_REPORT_QUEUE=embed_visit_report
+EMBED_VISIT_REPORT_DLQ=embed_visit_report_dlq
 WORKER_CONCURRENCY=2
 WORKER_USE_LLM=true
 WORKER_LOCAL_DB_PATH=
@@ -162,7 +163,7 @@ Production swap:
 
 - Keep the same storage driver.
 - Replace MinIO endpoint and credentials with Cloudflare R2, AWS S3, Supabase Storage S3, or another S3-compatible bucket.
-- A later optimization can move browser uploads to pre-signed URLs, but the persistence bottleneck is already isolated.
+- Browser uploads can use pre-signed URLs through the S3-compatible storage driver, keeping object credentials server-side.
 
 ## AI Service Auth
 
@@ -593,6 +594,15 @@ ANALYZE_VISIT_FAILED
   -> after final retry, copy payload/error to analyze_visit_dlq
 ```
 
+Embedding failure lifecycle:
+
+```text
+embed_visit_report failed
+  -> BullMQ retry according to job options
+  -> after final retry, copy payload/error to embed_visit_report_dlq
+  -> replay via npm run worker:dlq:replay -- --queue=embedding
+```
+
 Final status logic:
 
 | Condition | Final visit status |
@@ -755,9 +765,7 @@ npm run rag:index-reports -- --limit=100
 
 ## Repository Contract
 
-The worker currently uses `JsonVisitRepository` and `worker/data/db.json`.
-
-Replace it with a Prisma repository that implements:
+The worker uses `PrismaVisitRepository` when `DATABASE_URL` is present and keeps `JsonVisitRepository` as a local fallback. Repository implementations conform to:
 
 ```ts
 getVisitForAnalysis(visitId)

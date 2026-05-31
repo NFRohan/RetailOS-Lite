@@ -167,6 +167,6 @@ docker compose -f docker-compose.demo.yml exec worker npm run rag:index-reports 
 - Switch image uploads to pre-signed URLs.
 - Publish Postgres only through private networking.
 - Move local fixed-window rate limits to Redis/WAF-backed distributed rate limits.
-- Operationalize DLQ replay runbooks and permissions.
+- Schedule `npm run ops:archive -- --execute --delete` for retention once deployed.
 - Add backup/restore story for Postgres and object storage.
 - Add CI checks for build, worker types, and Python compile/tests.

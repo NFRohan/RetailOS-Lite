@@ -50,7 +50,7 @@ Code: `lib/outlets.ts`
 flowchart TD
   A[Rep submits shop name and GPS]
   B[Normalize name]
-  C[Load non-rejected outlets and aliases]
+  C[DB-assisted nearby + pg_trgm candidate prefilter]
   D[Score name similarity]
   E[Score geo proximity]
   F[Combine confidence]
@@ -80,7 +80,7 @@ Input:
 Matching steps:
 
 1. Normalize name.
-2. Fetch non-rejected outlets with aliases.
+2. Prefilter candidates in Postgres using bounding-box geo constraints and `pg_trgm` name similarity when available.
 3. Score by fuzzy name similarity and geo similarity.
 4. Filter to nearby candidates.
 5. Auto-match if confidence, radius, and margin thresholds pass.
@@ -177,12 +177,11 @@ This preserves reporting history and improves future matching.
 
 ## Production Notes
 
-Current implementation scores candidates in application code over a bounded outlet set. That is acceptable for demo scale.
+Current implementation uses database-assisted candidate prefiltering and then applies deterministic app-side scoring. If `pg_trgm` is unavailable, it falls back to bounded app-side matching so local demos keep working.
 
 Production hardening:
 
-- Move geo prefilter into SQL using bounding boxes or PostGIS.
-- Use `pg_trgm` for DB-side fuzzy name similarity.
+- Replace bounding-box distance with PostGIS geography indexes at large scale.
 - Add uniqueness or review constraints around same normalized name within radius.
 - Add supervisor audit notes for merge/reject decisions.
 - Keep alias creation idempotent.

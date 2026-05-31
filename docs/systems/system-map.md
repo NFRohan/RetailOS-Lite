@@ -64,6 +64,7 @@ Next.js App Router
   |     analyze_visit
   |     embed_visit_report
   |     analyze_visit_dlq
+  |     embed_visit_report_dlq
   |
   +--> Image Storage
         local public/uploads or S3-compatible bucket

@@ -196,7 +196,7 @@ Important secrets:
 | AI service public if exposed without key | Key required outside local/development/test | Keep service private and rotate keys through secret manager |
 | Object upload exposure | Browser uses pre-signed MinIO/S3 uploads | Add antivirus/content moderation if needed |
 | No per-outlet territory ACL | Role-level ACL only | Add rep territory/outlet assignments |
-| No audit actor on every EventLog | API/worker operational events include actor metadata where applicable | Add immutable audit export if required |
+| Immutable audit export | EventLog records actor metadata for API/worker events | Stream audit logs to append-only storage if required |
 
 ## Operational Guidance
 

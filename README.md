@@ -241,7 +241,7 @@ The demo stack is local-first, but the boundaries map cleanly to cloud infrastru
 - Secrets Manager or platform secrets for OpenAI, Pinecone, Twilio, Sentry, and auth secrets
 - Managed Grafana or hosted Sentry for production observability
 
-Known hardening items before production: edge/WAF rate-limit policy, managed DB pooler provisioning, PostGIS/pg_trgm outlet matching, long-term queue archival, image compression/thumbnails, and formal secret rotation.
+Known hardening items before production: edge/WAF rate-limit policy, managed DB pooler provisioning, scheduled archive retention, image compression/thumbnails, and formal secret rotation.
 
 ## Project Status
 

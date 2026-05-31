@@ -310,7 +310,7 @@ Say:
 
 Then acknowledge gaps:
 
-> If we had another sprint, I would add edge/WAF rate-limit policy, PostGIS/pg_trgm outlet matching, image compression, and long-term queue archival. The architecture already isolates those changes.
+> If we had another sprint, I would add edge/WAF rate-limit policy, image compression, scheduled retention jobs, and cloud-managed infrastructure. The architecture already isolates those changes.
 
 Final sentence:
 
@@ -397,7 +397,7 @@ Worker-side exact duplicate, perceptual duplicate, GPS mismatch, timestamp anoma
 
 ### What is production-ready vs demo-ready?
 
-Production-shaped: async queues, storage abstraction, API key auth, optional OAuth scaffold, RBAC, observability, DLQ replay, RAG grounding, and lightweight rate limits. Next hardening: signed uploads, DB pooling, distributed rate limits, and cloud deployment.
+Production-shaped: async queues, signed object uploads, API key auth, optional OAuth scaffold, RBAC, observability, DLQ replay, database-assisted outlet matching, RAG grounding, and Redis-backed rate limits. Next hardening: edge/WAF policy, managed pooling, image optimization, and cloud deployment.
 
 ## Do Not Say
 

@@ -35,7 +35,7 @@ Turn the internship-winning demo into a safer pilot-ready system without changin
 | Priority | Item | Notes |
 | --- | --- | --- |
 | P0 | Edge/WAF policy | App and AI limits are Redis-backed; public deployments should still add edge/WAF limits |
-| P1 | Scheduled archival automation | Manual archive tooling exists; schedule it for deployed environments |
+| P2 | Scheduled archival automation | Manual archive tooling exists; schedule it for deployed environments |
 | P2 | Image thumbnails/compression | Needed before real mobile rollout |
 | P2 | pgvector mirror | Optional fallback/ownership layer beside Pinecone |
 | P2 | Rich fraud severity model | Current UI focuses on signal count and reasons |

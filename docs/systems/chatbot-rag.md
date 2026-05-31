@@ -137,6 +137,8 @@ Pinecone metadata:
 - `createdAt`
 - `source=visit_report`
 
+Failed `embed_visit_report` jobs are copied to `embed_visit_report_dlq` after terminal retries. They can be replayed with `npm run worker:dlq:replay -- --queue=embedding` or through the admin-only `POST /api/ops/dlq/replay` endpoint.
+
 ## Assistant Generation
 
 Model is configured via:
@@ -218,6 +220,5 @@ When duplicate outlets are merged:
 ## Known Gaps
 
 - Pinecone is external state; database deletes do not cascade automatically, but namespace reset tooling exists.
-- No DLQ replay for failed embedding jobs.
 - No pgvector mirror inside Postgres.
 - The intent parser is pragmatic, not a full semantic query planner.
