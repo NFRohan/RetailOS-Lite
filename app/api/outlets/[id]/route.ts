@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import type { NextRequest } from "next/server";
+import { userEventActor } from "@/lib/event-log";
 import { normalizeOutletName, numberOrNull } from "@/lib/outlets";
 import { parseOutletVerificationStatus, type OutletVerificationStatus } from "@/lib/outlet-types";
 import { prisma } from "@/lib/prisma";
@@ -36,6 +37,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     data: {
       event: "OUTLET_VERIFICATION_UPDATED",
       level: "info",
+      ...userEventActor(session.user),
       metadata: {
         outletId: outlet.id,
         outletName: outlet.name,

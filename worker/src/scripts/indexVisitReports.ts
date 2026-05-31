@@ -33,6 +33,7 @@ async function main() {
               visitId: report.visitId,
               event: "VISIT_REPORT_INDEXED_BACKFILL",
               level: "info",
+              actorType: "system",
               metadata: {
                 vectorId: `visit-report:${report.visitId}`,
               },

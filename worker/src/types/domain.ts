@@ -90,6 +90,9 @@ export type EventLogRecord = {
   event: string;
   level: "info" | "warn" | "error";
   traceId?: string;
+  actorId?: string;
+  actorRole?: string;
+  actorType?: "system" | "worker" | "user";
   metadata?: Record<string, unknown>;
   createdAt: string;
 };

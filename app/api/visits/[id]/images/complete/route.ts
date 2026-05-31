@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { HeadObjectCommand } from "@aws-sdk/client-s3";
+import { userEventActor } from "@/lib/event-log";
 import { correlationIdFromHeaders } from "@/lib/observability/correlation";
 import { logError, logInfo } from "@/lib/observability/logger";
 import { metrics } from "@/lib/observability/metrics";
@@ -73,6 +74,7 @@ export async function POST(request: NextRequest, { params }: Params) {
         event: "UPLOAD_STORED",
         level: "info",
         traceId: correlationId,
+        ...userEventActor(session.user),
         metadata: {
           imageId: image.id,
           storageDriver: "s3",

@@ -6,6 +6,7 @@ import {
   fallbackAssistantAnswer,
   type AssistantAnswer,
 } from "@/lib/assistant";
+import { userEventActor } from "@/lib/event-log";
 import { correlationIdFromHeaders } from "@/lib/observability/correlation";
 import { logError, logInfo, logWarn } from "@/lib/observability/logger";
 import { metrics } from "@/lib/observability/metrics";
@@ -39,6 +40,7 @@ export async function POST(request: NextRequest) {
       level: "info",
       traceId: correlationId,
       userId: session.user.id,
+      userRole: session.user.role,
       question,
       latencyMs,
       exactContextCount: 0,
@@ -85,6 +87,7 @@ export async function POST(request: NextRequest) {
         level: "warn",
         traceId: correlationId,
         userId: session.user.id,
+        userRole: session.user.role,
         question,
         latencyMs,
         exactContextCount: exactContext.length,
@@ -112,6 +115,7 @@ export async function POST(request: NextRequest) {
       level: "info",
       traceId: correlationId,
       userId: session.user.id,
+      userRole: session.user.role,
       question,
       latencyMs,
       exactContextCount: exactContext.length,
@@ -143,6 +147,7 @@ export async function POST(request: NextRequest) {
       level: "error",
       traceId: correlationId,
       userId: session.user.id,
+      userRole: session.user.role,
       question,
       latencyMs: Date.now() - started,
       exactContextCount: exactContext.length,
@@ -162,6 +167,7 @@ async function recordAssistantEvent(input: {
   level: string;
   traceId: string;
   userId: string;
+  userRole: string;
   question: string;
   latencyMs: number;
   exactContextCount: number;
@@ -175,6 +181,7 @@ async function recordAssistantEvent(input: {
       data: {
         event: input.event,
         level: input.level,
+        ...userEventActor({ id: input.userId, role: input.userRole }),
         traceId: input.traceId,
         metadata: {
           stage: "assistant",

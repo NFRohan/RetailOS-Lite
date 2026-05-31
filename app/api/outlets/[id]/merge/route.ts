@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { userEventActor } from "@/lib/event-log";
 import { mergeOutlet, OutletResolutionError } from "@/lib/outlets";
 import { enqueueVisitReportIndex } from "@/lib/queue";
 import { prisma } from "@/lib/prisma";
@@ -34,6 +35,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       data: {
         event: "OUTLET_MERGED",
         level: "info",
+        ...userEventActor(session.user),
         metadata: {
           sourceOutletId: id,
           targetOutletId: result.outlet.id,

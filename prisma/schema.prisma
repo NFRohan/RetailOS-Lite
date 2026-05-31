@@ -209,10 +209,14 @@ model EventLog {
   event     String
   level     String
   traceId   String?
+  actorId   String?
+  actorRole String?
+  actorType String?
   metadata  Json?
   createdAt DateTime @default(now())
 
   @@index([createdAt])
+  @@index([actorId, createdAt])
   @@index([visitId, createdAt])
   @@index([event, createdAt])
 }

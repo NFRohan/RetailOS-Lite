@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import type { NextRequest } from "next/server";
+import { userEventActor } from "@/lib/event-log";
 import { numberOrNull, OutletResolutionError, resolveOutletForVisit } from "@/lib/outlets";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
@@ -133,6 +134,7 @@ export async function POST(request: NextRequest) {
           visitId: visit.id,
           event: "OUTLET_SUBMISSION_RESOLVED",
           level: "info",
+          ...userEventActor(session.user),
           metadata: {
             outletId: outletResolution.outlet.id,
             outletName: outletResolution.outlet.name,

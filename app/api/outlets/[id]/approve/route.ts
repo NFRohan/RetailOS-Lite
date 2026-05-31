@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { userEventActor } from "@/lib/event-log";
 import { approveOutlet, OutletResolutionError } from "@/lib/outlets";
 import { prisma } from "@/lib/prisma";
 import { requireApiSession, ROLE_GROUPS } from "@/lib/rbac";
@@ -25,6 +26,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       data: {
         event: "OUTLET_APPROVED",
         level: "info",
+        ...userEventActor(session.user),
         metadata: { outletId: outlet.id, supervisorId: session.user.id, submissionId: body.submissionId ?? null },
       },
     });
