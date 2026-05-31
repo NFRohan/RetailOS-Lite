@@ -108,7 +108,7 @@ app.mount("/artifacts/overlays", StaticFiles(directory=str(config.OVERLAY_DIR)),
 
 def should_require_api_key(request: Request) -> bool:
     return (
-        bool(config.AI_SERVICE_API_KEY)
+        (bool(config.AI_SERVICE_API_KEY) or config.requires_ai_service_api_key())
         and request.method != "OPTIONS"
         and request.url.path in PROTECTED_AI_PATHS
     )

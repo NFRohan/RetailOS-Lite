@@ -109,4 +109,10 @@ def readiness_errors() -> list[str]:
         errors.append("RETAILOS_MODAL_YOLO_URL is required when RETAILOS_YOLO_BACKEND=modal")
     if YOLO_BACKEND not in {"local", "modal"}:
         errors.append("RETAILOS_YOLO_BACKEND must be either local or modal")
+    if requires_ai_service_api_key() and not AI_SERVICE_API_KEY:
+        errors.append("RETAILOS_AI_SERVICE_API_KEY is required outside local/development/test environments")
     return errors
+
+
+def requires_ai_service_api_key() -> bool:
+    return APP_ENV.lower() not in {"local", "development", "dev", "test"}
