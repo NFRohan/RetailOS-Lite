@@ -19,6 +19,7 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
+    "db:extensions": "tsx scripts/setup-postgres-extensions.ts",
     "db:seed": "tsx prisma/seed.ts",
     "demo:build": "set COMPOSE_BAKE=false&& docker compose -f docker-compose.demo.yml build ai-service && docker compose -f docker-compose.demo.yml build web && docker compose -f docker-compose.demo.yml build worker && docker compose -f docker-compose.demo.yml build app-init",
     "demo:up": "docker compose -f docker-compose.demo.yml up",

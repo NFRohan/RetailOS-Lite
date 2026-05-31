@@ -162,7 +162,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: ["sh", "-c", "npm run db:push && npm run db:seed"]
+    command: ["sh", "-c", "npm run db:push && npm run db:extensions && npm run db:seed"]
 
   web:
     image: retailos-lite-demo-web:latest

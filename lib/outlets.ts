@@ -108,14 +108,11 @@ export async function searchOutletCandidates({
   const normalizedQuery = normalizeOutletName(submittedName);
   const submittedLat = requiredNumber(lat, "GPS latitude is required for outlet search.");
   const submittedLng = requiredNumber(lng, "GPS longitude is required for outlet search.");
-
-  const outlets = await prisma.outlet.findMany({
-    where: { verificationStatus: { not: "REJECTED" } },
-    include: {
-      aliases: true,
-      _count: { select: { visits: true } },
-    },
-    take: 500,
+  const outlets = await loadOutletSearchPool({
+    normalizedQuery,
+    submittedLat,
+    submittedLng,
+    radiusMeters,
   });
 
   const candidates = outlets
@@ -135,6 +132,99 @@ export async function searchOutletCandidates({
     autoMatch,
     canCreateNew: true,
   };
+}
+
+async function loadOutletSearchPool({
+  normalizedQuery,
+  submittedLat,
+  submittedLng,
+  radiusMeters,
+}: {
+  normalizedQuery: string;
+  submittedLat: number;
+  submittedLng: number;
+  radiusMeters: number;
+}): Promise<OutletWithAliases[]> {
+  const dbIds = await loadOutletSearchIdsFromPostgres({
+    normalizedQuery,
+    submittedLat,
+    submittedLng,
+    radiusMeters,
+  });
+
+  if (dbIds.length > 0) {
+    const outlets = await prisma.outlet.findMany({
+      where: { id: { in: dbIds } },
+      include: {
+        aliases: true,
+        _count: { select: { visits: true } },
+      },
+    });
+    const order = new Map(dbIds.map((id, index) => [id, index]));
+    return outlets.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+  }
+
+  return prisma.outlet.findMany({
+    where: { verificationStatus: { not: "REJECTED" } },
+    include: {
+      aliases: true,
+      _count: { select: { visits: true } },
+    },
+    take: 500,
+  });
+}
+
+async function loadOutletSearchIdsFromPostgres({
+  normalizedQuery,
+  submittedLat,
+  submittedLng,
+  radiusMeters,
+}: {
+  normalizedQuery: string;
+  submittedLat: number;
+  submittedLng: number;
+  radiusMeters: number;
+}): Promise<string[]> {
+  try {
+    const latitudeDelta = radiusMeters / 111_320;
+    const longitudeDelta = radiusMeters / (111_320 * Math.max(0.1, Math.cos(toRadians(submittedLat))));
+    const rows = await prisma.$queryRaw<Array<{ id: string }>>`
+      WITH candidate_scores AS (
+        SELECT
+          o.id,
+          (
+            6371000 * 2 * asin(
+              sqrt(
+                power(sin(radians((o.latitude - ${submittedLat}) / 2)), 2) +
+                cos(radians(${submittedLat})) *
+                cos(radians(o.latitude)) *
+                power(sin(radians((o.longitude - ${submittedLng}) / 2)), 2)
+              )
+            )
+          ) AS distance_meters,
+          greatest(
+            similarity(coalesce(o."normalizedName", ''), ${normalizedQuery}),
+            coalesce(max(similarity(coalesce(a."normalizedAlias", ''), ${normalizedQuery})), 0)
+          ) AS name_similarity
+        FROM "Outlet" o
+        LEFT JOIN "OutletAlias" a ON a."outletId" = o.id
+        WHERE o."verificationStatus" != 'REJECTED'
+          AND o.latitude IS NOT NULL
+          AND o.longitude IS NOT NULL
+          AND o.latitude BETWEEN ${submittedLat - latitudeDelta} AND ${submittedLat + latitudeDelta}
+          AND o.longitude BETWEEN ${submittedLng - longitudeDelta} AND ${submittedLng + longitudeDelta}
+        GROUP BY o.id
+      )
+      SELECT id
+      FROM candidate_scores
+      WHERE distance_meters <= ${radiusMeters}
+      ORDER BY name_similarity DESC, distance_meters ASC
+      LIMIT 80
+    `;
+    return rows.map((row) => row.id);
+  } catch {
+    return [];
+  }
 }
 
 export async function submitOutletSelection({
