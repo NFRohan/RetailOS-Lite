@@ -30,6 +30,7 @@ dist/
 
 # --- Logs & debug ------------------------------------------------------------
 logs/
+archives/
 *.log
 npm-debug.log*
 yarn-debug.log*

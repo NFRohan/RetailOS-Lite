@@ -15,6 +15,7 @@
     "worker:dlq:replay": "tsx worker/src/scripts/replayDlq.ts",
     "rag:index-reports": "tsx worker/src/scripts/indexVisitReports.ts",
     "rag:clear-namespace": "tsx scripts/clear-pinecone-namespace.ts",
+    "ops:archive": "tsx scripts/archive-operational-data.ts",
     "check:worker": "tsc --noEmit -p tsconfig.worker.json",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
