@@ -15,7 +15,7 @@ import { requireApiSession, ROLE_GROUPS } from "@/lib/rbac";
 import { NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
-  const limited = rateLimit(request, { bucket: "assistant", limit: 20, windowMs: 60_000 });
+  const limited = await rateLimit(request, { bucket: "assistant", limit: 20, windowMs: 60_000 });
   if (limited) return limited;
 
   const correlationId = correlationIdFromHeaders(request.headers, "assistant");

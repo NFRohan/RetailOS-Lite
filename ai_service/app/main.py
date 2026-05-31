@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.responses import Response as FastApiResponse
 from fastapi.staticfiles import StaticFiles
+from redis.asyncio import Redis
 
 from . import config
 from .compliance import build_supervisor_summary, evaluate_compliance
@@ -54,7 +55,7 @@ PROTECTED_AI_PATHS = {
     "/assistant/query",
 }
 
-_rate_limit_buckets: dict[str, tuple[int, float]] = {}
+_rate_limit_redis: Redis | None = None
 
 
 @app.middleware("http")
@@ -70,7 +71,22 @@ async def api_key_middleware(request: Request, call_next):
 @app.middleware("http")
 async def protected_endpoint_rate_limit_middleware(request: Request, call_next):
     if should_rate_limit(request):
-        allowed, retry_after = consume_rate_limit(request)
+        try:
+            allowed, retry_after = await consume_rate_limit(request)
+        except Exception as error:
+            log_event(
+                "ai_service_rate_limit_unavailable",
+                path=request.url.path,
+                method=request.method,
+                error=str(error),
+            )
+            if config.AI_SERVICE_RATE_LIMIT_FAIL_OPEN:
+                return await call_next(request)
+            return JSONResponse(
+                {"detail": "Rate limiter unavailable. Please retry shortly."},
+                status_code=503,
+                headers={"Retry-After": "5"},
+            )
         if not allowed:
             log_event(
                 "ai_service_rate_limited",
@@ -107,30 +123,30 @@ def should_rate_limit(request: Request) -> bool:
     )
 
 
-def consume_rate_limit(request: Request) -> tuple[bool, int]:
-    now = time.time()
-    window_seconds = 60
+async def consume_rate_limit(request: Request) -> tuple[bool, int]:
     identity = request.headers.get("x-forwarded-for", "").split(",")[0].strip() or (
         request.client.host if request.client else "local"
     )
-    key = f"{request.url.path}:{identity}"
-    count, reset_at = _rate_limit_buckets.get(key, (0, now + window_seconds))
-    if reset_at <= now:
-        count = 0
-        reset_at = now + window_seconds
-    count += 1
-    _rate_limit_buckets[key] = (count, reset_at)
-    prune_rate_limit_buckets(now)
-    retry_after = max(1, int(reset_at - now))
+    key = f"rate-limit:ai-service:{request.url.path}:{identity}"
+    redis = get_rate_limit_redis()
+    count = await redis.incr(key)
+    if count == 1:
+        await redis.pexpire(key, 60_000)
+    ttl_ms = await redis.pttl(key)
+    retry_after = max(1, int((ttl_ms if ttl_ms > 0 else 60_000) / 1000))
     return count <= config.AI_SERVICE_RATE_LIMIT_PER_MINUTE, retry_after
 
 
-def prune_rate_limit_buckets(now: float) -> None:
-    if len(_rate_limit_buckets) < 1000:
-        return
-    expired = [key for key, (_, reset_at) in _rate_limit_buckets.items() if reset_at <= now]
-    for key in expired:
-        _rate_limit_buckets.pop(key, None)
+def get_rate_limit_redis() -> Redis:
+    global _rate_limit_redis
+    if _rate_limit_redis is None:
+        _rate_limit_redis = Redis.from_url(
+            config.AI_SERVICE_RATE_LIMIT_REDIS_URL,
+            socket_connect_timeout=1,
+            socket_timeout=1,
+            decode_responses=True,
+        )
+    return _rate_limit_redis
 
 
 @app.get("/health", response_model=HealthResponse)

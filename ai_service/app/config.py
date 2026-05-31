@@ -73,6 +73,11 @@ YOLO_FALLBACK_LOCAL = _bool_from_env("RETAILOS_YOLO_FALLBACK_LOCAL", True)
 AI_SERVICE_API_KEY = os.getenv("RETAILOS_AI_SERVICE_API_KEY", os.getenv("AI_SERVICE_API_KEY", "")).strip()
 AI_SERVICE_RATE_LIMIT_ENABLED = _bool_from_env("AI_SERVICE_RATE_LIMIT_ENABLED", True)
 AI_SERVICE_RATE_LIMIT_PER_MINUTE = _int_from_env("AI_SERVICE_RATE_LIMIT_PER_MINUTE", 60)
+AI_SERVICE_RATE_LIMIT_FAIL_OPEN = _bool_from_env("AI_SERVICE_RATE_LIMIT_FAIL_OPEN", False)
+AI_SERVICE_RATE_LIMIT_REDIS_URL = os.getenv(
+    "AI_SERVICE_RATE_LIMIT_REDIS_URL",
+    os.getenv("RATE_LIMIT_REDIS_URL", os.getenv("REDIS_URL", "redis://127.0.0.1:6379")),
+).strip()
 APP_ENV = os.getenv("APP_ENV", os.getenv("ENVIRONMENT", "development"))
 SENTRY_DSN = os.getenv("SENTRY_DSN", "").strip()
 SENTRY_RELEASE = os.getenv("SENTRY_RELEASE", "").strip()

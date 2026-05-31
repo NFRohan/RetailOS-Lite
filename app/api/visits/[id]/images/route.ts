@@ -12,7 +12,7 @@ import { NextResponse } from "next/server";
 type Params = { params: Promise<{ id: string }> };
 
 export async function POST(request: NextRequest, { params }: Params) {
-  const limited = rateLimit(request, { bucket: "image-upload", limit: 30, windowMs: 60_000 });
+  const limited = await rateLimit(request, { bucket: "image-upload", limit: 30, windowMs: 60_000 });
   if (limited) return limited;
 
   const correlationId = correlationIdFromHeaders(request.headers, "upload");

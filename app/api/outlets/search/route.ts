@@ -5,7 +5,7 @@ import { requireApiSession } from "@/lib/rbac";
 import { NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
-  const limited = rateLimit(request, { bucket: "outlet-search", limit: 120, windowMs: 60_000 });
+  const limited = await rateLimit(request, { bucket: "outlet-search", limit: 120, windowMs: 60_000 });
   if (limited) return limited;
 
   const authz = await requireApiSession();

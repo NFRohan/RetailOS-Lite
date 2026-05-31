@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { Redis } from "ioredis";
 import { NextResponse } from "next/server";
 
 type RateLimitOptions = {
@@ -7,35 +8,34 @@ type RateLimitOptions = {
   windowMs: number;
 };
 
-type BucketState = {
-  count: number;
-  resetAt: number;
-};
+let redisConnection: Redis | null = null;
 
-const buckets = new Map<string, BucketState>();
-
-export function rateLimit(request: NextRequest, options: RateLimitOptions): NextResponse | null {
+export async function rateLimit(request: NextRequest, options: RateLimitOptions): Promise<NextResponse | null> {
   if (isDisabled()) return null;
 
-  const now = Date.now();
   const identity = clientIdentity(request);
-  const key = `${options.bucket}:${identity}`;
-  const current = buckets.get(key);
-  const state =
-    current && current.resetAt > now
-      ? current
-      : {
-          count: 0,
-          resetAt: now + options.windowMs,
-        };
+  const key = `rate-limit:${options.bucket}:${identity}`;
+  const redis = getRateLimitRedis();
+  let count: number;
+  let ttlMs: number;
+  try {
+    count = await redis.incr(key);
+    if (count === 1) {
+      await redis.pexpire(key, options.windowMs);
+    }
+    ttlMs = await redis.pttl(key);
+  } catch {
+    if (process.env.RATE_LIMIT_FAIL_OPEN?.toLowerCase() === "true") return null;
+    return NextResponse.json(
+      { error: "Rate limiter unavailable. Please retry shortly." },
+      { status: 503, headers: { "Retry-After": "5" } },
+    );
+  }
+  const retryAfterSeconds = Math.max(1, Math.ceil((ttlMs > 0 ? ttlMs : options.windowMs) / 1000));
+  const remaining = Math.max(0, options.limit - count);
 
-  state.count += 1;
-  buckets.set(key, state);
-  pruneExpiredBuckets(now);
+  if (count <= options.limit) return null;
 
-  if (state.count <= options.limit) return null;
-
-  const retryAfterSeconds = Math.max(1, Math.ceil((state.resetAt - now) / 1000));
   return NextResponse.json(
     {
       error: "Too many requests. Please retry shortly.",
@@ -46,8 +46,8 @@ export function rateLimit(request: NextRequest, options: RateLimitOptions): Next
       headers: {
         "Retry-After": String(retryAfterSeconds),
         "X-RateLimit-Limit": String(options.limit),
-        "X-RateLimit-Remaining": "0",
-        "X-RateLimit-Reset": String(Math.ceil(state.resetAt / 1000)),
+        "X-RateLimit-Remaining": String(remaining),
+        "X-RateLimit-Reset": String(Math.ceil((Date.now() + retryAfterSeconds * 1000) / 1000)),
       },
     },
   );
@@ -68,9 +68,12 @@ function isDisabled(): boolean {
   return process.env.API_RATE_LIMIT_ENABLED?.toLowerCase() === "false";
 }
 
-function pruneExpiredBuckets(now: number): void {
-  if (buckets.size < 1000) return;
-  for (const [key, state] of buckets.entries()) {
-    if (state.resetAt <= now) buckets.delete(key);
+function getRateLimitRedis(): Redis {
+  if (!redisConnection) {
+    redisConnection = new Redis(process.env.RATE_LIMIT_REDIS_URL || process.env.REDIS_URL || "redis://127.0.0.1:6379", {
+      maxRetriesPerRequest: 1,
+      enableOfflineQueue: true,
+    });
   }
+  return redisConnection;
 }
